@@ -4,10 +4,14 @@ const DEFAULT_PRODUCT_NUCLIDE = "205Au";
 const DEFAULT_SOURCE_MOLAR_MASS_G = 207.9766525;
 const DEFAULT_PRODUCT_MOLAR_MASS_G = 204.974;
 
+currentLang = detectLang();
+applyI18n();
+
 const params = readParams();
 const els = {
   canvas: document.getElementById("chamber"),
   speed: document.getElementById("speed"),
+  lang: document.getElementById("lang"),
   pause: document.getElementById("pause"),
   restart: document.getElementById("restart"),
   collisions: document.getElementById("stat-collisions"),
@@ -21,11 +25,15 @@ const els = {
   result: document.getElementById("op-result"),
   log: document.getElementById("log"),
   golds: document.getElementById("golds"),
+  form: document.getElementById("params-form"),
+  error: document.getElementById("params-error"),
 };
 
 const reaction = `${params.sourceNuclide} → ${params.productNuclide}`;
-document.title = `Simulazione didattica ${reaction}`;
+document.title = t("doc_title", { reaction });
 document.getElementById("reaction-title").textContent = reaction;
+els.canvas.setAttribute("aria-label", t("chamber_aria"));
+els.lang.value = currentLang;
 
 const ctx = els.canvas.getContext("2d");
 const rng = mulberry32(params.seed);
@@ -50,56 +58,82 @@ const expectedProduct = params.collisions * params.probability;
 
 const setupOps = [
   {
-    phase: "Setup",
-    title: "Lettura parametri",
-    formula: `nuclide di partenza = ${params.sourceNuclide}\nnuclide di arrivo = ${params.productNuclide}\nmassa bersaglio = ${fmt(params.sourceMassG)} g\nfrazione del nuclide di partenza = ${fmt(params.sourceFraction)}\ncollisioni = ${params.collisions.toLocaleString("it-IT")}\nprobabilità didattica = ${fmt(params.probability)}\nseme = ${params.seed}`,
-    result: "Parametri caricati nel modello",
-    log: "Parametri di ingresso acquisiti",
+    phase: t("phase_setup"),
+    title: t("setup_read_title"),
+    formula: t("setup_read_formula", {
+      source: params.sourceNuclide,
+      product: params.productNuclide,
+      mass: fmt(params.sourceMassG),
+      fraction: fmt(params.sourceFraction),
+      collisions: fmtCount(params.collisions),
+      probability: fmt(params.probability),
+      seed: params.seed,
+    }),
+    result: t("setup_read_result"),
+    log: t("setup_read_log"),
   },
   {
-    phase: "Setup",
-    title: "Calcolo massa del nuclide di partenza",
-    formula: "m(sorgente) = massa bersaglio × frazione\n"
-      + `${fmt(params.sourceMassG)} × ${fmt(params.sourceFraction)}`,
-    result: `m(${params.sourceNuclide}) = ${fmt(sourceMass)} g`,
-    log: `Massa teorica ${params.sourceNuclide}: ${fmt(sourceMass)} g`,
+    phase: t("phase_setup"),
+    title: t("setup_mass_title"),
+    formula: t("setup_mass_formula", {
+      mass: fmt(params.sourceMassG),
+      fraction: fmt(params.sourceFraction),
+    }),
+    result: t("setup_mass_result", { source: params.sourceNuclide, value: fmt(sourceMass) }),
+    log: t("setup_mass_log", { source: params.sourceNuclide, value: fmt(sourceMass) }),
   },
   {
-    phase: "Setup",
-    title: "Calcolo nuclei candidati",
-    formula: "N = m / M × N_A\n"
-      + `${fmt(sourceMass)} / ${params.sourceMolarMassG} × ${AVOGADRO.toExponential(8)}`,
-    result: `N(${params.sourceNuclide}) = ${fmtSci(sourceNuclei)}`,
-    log: `Nuclei teorici di ${params.sourceNuclide}: ${fmtSci(sourceNuclei)}`,
+    phase: t("phase_setup"),
+    title: t("setup_nuclei_title"),
+    formula: t("setup_nuclei_formula", {
+      mass: fmt(sourceMass),
+      molar: params.sourceMolarMassG,
+      avogadro: AVOGADRO.toExponential(8),
+    }),
+    result: t("setup_nuclei_result", { source: params.sourceNuclide, value: fmtSci(sourceNuclei) }),
+    log: t("setup_nuclei_log", { source: params.sourceNuclide, value: fmtSci(sourceNuclei) }),
   },
   {
-    phase: "Setup",
-    title: "Valore atteso",
-    formula: "eventi attesi = collisioni × probabilità\n"
-      + `${params.collisions.toLocaleString("it-IT")} × ${fmt(params.probability)}`,
-    result: `eventi attesi = ${fmt(expectedProduct)}`,
-    log: `Eventi attesi: ${fmt(expectedProduct)}`,
+    phase: t("phase_setup"),
+    title: t("setup_expected_title"),
+    formula: t("setup_expected_formula", {
+      collisions: fmtCount(params.collisions),
+      probability: fmt(params.probability),
+    }),
+    result: t("setup_expected_result", { value: fmt(expectedProduct) }),
+    log: t("setup_expected_log", { value: fmt(expectedProduct) }),
   },
   {
-    phase: "Setup",
-    title: "Avvio collisioni virtuali",
-    formula: "per ogni collisione:\n  u ~ Uniforme(0, 1)\n  se u < p e restano nuclei candidati\n    sorgente → prodotto",
-    result: `Registro ogni estrazione, il confronto con p e l'esito ${reaction}`,
-    log: "Inizio del ciclo Monte Carlo visibile",
+    phase: t("phase_setup"),
+    title: t("setup_start_title"),
+    formula: t("setup_start_formula"),
+    result: t("setup_start_result", { reaction }),
+    log: t("setup_start_log"),
   },
 ];
 
 els.expected.textContent = fmt(expectedProduct);
+fillForm(params);
+els.form.addEventListener("submit", (event) => {
+  event.preventDefault();
+  applyForm();
+});
+els.lang.addEventListener("change", () => {
+  const query = currentQuery();
+  query.set("lang", els.lang.value);
+  window.location.search = query.toString();
+});
 els.pause.addEventListener("click", () => {
   state.paused = !state.paused;
-  els.pause.textContent = state.paused ? "Riprendi" : "Pausa";
+  els.pause.textContent = state.paused ? t("resume") : t("pause");
 });
 els.restart.addEventListener("click", () => window.location.reload());
 window.addEventListener("keydown", (event) => {
-  if (event.code === "Space") {
-    event.preventDefault();
-    els.pause.click();
-  }
+  if (event.code !== "Space") return;
+  const tag = event.target && event.target.tagName;
+  if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(tag)) return;
+  event.preventDefault();
+  els.pause.click();
 });
 window.addEventListener("resize", fitCanvas);
 fitCanvas();
@@ -124,10 +158,10 @@ function step(dt) {
       if (state.setupIndex >= setupOps.length) {
         state.phase = "running";
         setOp(
-          "Collisione",
-          "Prima estrazione casuale",
-          "u ~ Uniforme(0, 1)\nconfronto con p didattica",
-          "In attesa della collisione 1",
+          t("phase_collision"),
+          t("first_draw_title"),
+          t("first_draw_formula"),
+          t("first_draw_result"),
         );
       } else {
         showSetupOp(setupOps[state.setupIndex], false);
@@ -161,7 +195,11 @@ function runCollisions(count) {
       convertNucleus();
       state.flashes.push({ t: 0, gold: true });
       logLine(
-        `Collisione ${index.toLocaleString("it-IT")}: u=${u.toFixed(8)} < p → ${params.productNuclide}`,
+        t("collision_hit_log", {
+          index: fmtCount(index),
+          u: u.toFixed(8),
+          product: params.productNuclide,
+        }),
         "gold",
       );
       addGold(index, u);
@@ -170,7 +208,7 @@ function runCollisions(count) {
     state.collision += 1;
     if (!success && Number(els.speed.value) <= 8) {
       logLine(
-        `Collisione ${index.toLocaleString("it-IT")}: u=${u.toFixed(8)} ≥ p → nessuna trasmutazione`,
+        t("collision_miss_log", { index: fmtCount(index), u: u.toFixed(8) }),
         "miss",
       );
     }
@@ -179,15 +217,18 @@ function runCollisions(count) {
   if (last) {
     const productMass = state.gold * params.productMolarMassG / AVOGADRO;
     setOp(
-      "Collisione",
-      `Collisione ${last.index.toLocaleString("it-IT")}`,
-      `u = ${last.u.toFixed(8)}\np = ${params.probability}\nu < p ? ${last.success ? "sì" : "no"}`,
-      last.success
-        ? `Trasmutazione didattica ${reaction}`
-        : "Nessuna trasmutazione",
+      t("phase_collision"),
+      t("collision_title", { index: fmtCount(last.index) }),
+      t("collision_formula", {
+        u: last.u.toFixed(8),
+        p: params.probability,
+        answer: last.success ? t("yes") : t("no"),
+      }),
+      last.success ? t("didactic_transmutation", { reaction }) : t("no_transmutation"),
+      last.success ? "gold" : "ok",
     );
-    els.collisions.textContent = last.index.toLocaleString("it-IT");
-    els.gold.textContent = state.gold.toLocaleString("it-IT");
+    els.collisions.textContent = fmtCount(last.index);
+    els.gold.textContent = fmtCount(state.gold);
     els.mass.textContent = `${productMass.toExponential(4)} g`;
     els.progress.style.width = `${(state.collision / params.collisions) * 100}%`;
     if (
@@ -195,10 +236,7 @@ function runCollisions(count) {
       && Number(els.speed.value) > 8
       && last.index % Math.max(1, Math.floor(params.collisions / 20)) === 0
     ) {
-      logLine(
-        `Collisione ${last.index.toLocaleString("it-IT")}: nessuna trasmutazione`,
-        "miss",
-      );
+      logLine(t("collision_miss_short", { index: fmtCount(last.index) }), "miss");
     }
   }
 
@@ -213,18 +251,29 @@ function finish() {
   const remainingSource = Math.max(sourceNuclei - state.gold, 0);
   const converted = sourceNuclei ? state.gold / sourceNuclei : 0;
   setOp(
-    "Risultati",
-    "Chiusura della simulazione",
-    `eventi simulati = ${state.gold.toLocaleString("it-IT")}\n`
-      + `eventi attesi = ${fmt(expectedProduct)}\n`
-      + `${params.sourceNuclide} rimanenti = ${fmtSci(remainingSource)}\n`
-      + `frazione convertita = ${converted.toExponential(6)}\n`
-      + `massa ${params.productNuclide} = ${productMass.toExponential(6)} g`,
-    "Nessun nuclide reale è stato prodotto",
+    t("phase_results"),
+    t("results_title"),
+    t("results_formula", {
+      simulated: fmtCount(state.gold),
+      expected: fmt(expectedProduct),
+      source: params.sourceNuclide,
+      remaining: fmtSci(remainingSource),
+      converted: converted.toExponential(6),
+      product: params.productNuclide,
+      mass: productMass.toExponential(6),
+    }),
+    t("no_real_nuclei"),
+    "gold",
   );
-  logLine(`Eventi simulati: ${state.gold.toLocaleString("it-IT")}`, "gold");
-  logLine(`Massa equivalente di ${params.productNuclide}: ${productMass.toExponential(6)} g`, "setup");
-  logLine("Avvertenza: modello puramente didattico", "miss");
+  logLine(t("events_simulated_log", { value: fmtCount(state.gold) }), "gold");
+  logLine(
+    t("equivalent_mass_log", {
+      product: params.productNuclide,
+      mass: productMass.toExponential(6),
+    }),
+    "setup",
+  );
+  logLine(t("didactic_warning_log"), "miss");
 }
 
 function showSetupOp(op, writeLog) {
@@ -232,14 +281,12 @@ function showSetupOp(op, writeLog) {
   if (writeLog) logLine(op.log, "setup");
 }
 
-function setOp(phase, title, formula, result) {
+function setOp(phase, title, formula, result, tone) {
   els.phase.textContent = phase;
   els.title.textContent = title;
   els.formula.textContent = formula;
   els.result.textContent = result;
-  els.result.style.color = phase === "Risultati" || result.includes("Trasmutazione")
-    ? "#e2b340"
-    : "#7ddeb0";
+  els.result.style.color = tone === "gold" ? "#e2b340" : "#7ddeb0";
 }
 
 function logLine(text, kind) {
@@ -253,7 +300,7 @@ function logLine(text, kind) {
 function addGold(index, u) {
   if (els.golds.querySelector(".empty")) els.golds.innerHTML = "";
   const li = document.createElement("li");
-  li.textContent = `#${index.toLocaleString("it-IT")}  u=${u.toFixed(8)}`;
+  li.textContent = `#${fmtCount(index)}  u=${u.toFixed(8)}`;
   els.golds.prepend(li);
 }
 
@@ -352,8 +399,8 @@ function draw() {
 
   ctx.fillStyle = "#e7edf6";
   ctx.font = "12px Menlo, monospace";
-  ctx.fillText("fascio virtuale", -248, -18);
-  ctx.fillText(`bersaglio ${params.sourceNuclide}`, 48, -18);
+  ctx.fillText(t("virtual_beam"), -248, -18);
+  ctx.fillText(t("target_label", { source: params.sourceNuclide }), 48, -18);
   ctx.restore();
 }
 
@@ -379,12 +426,95 @@ function readParams() {
   };
 }
 
+function fillForm(values) {
+  const fields = els.form.elements;
+  fields.source_nuclide.value = values.sourceNuclide;
+  fields.product_nuclide.value = values.productNuclide;
+  fields.source_mass_g.value = values.sourceMassG;
+  fields.source_fraction.value = values.sourceFraction;
+  fields.source_molar_mass_g.value = values.sourceMolarMassG;
+  fields.product_molar_mass_g.value = values.productMolarMassG;
+  fields.collisions.value = values.collisions;
+  fields.probability.value = values.probability;
+  fields.seed.value = values.seed;
+}
+
+function readForm() {
+  const fields = els.form.elements;
+  return {
+    sourceNuclide: fields.source_nuclide.value.trim(),
+    productNuclide: fields.product_nuclide.value.trim(),
+    sourceMassG: Number(fields.source_mass_g.value),
+    sourceFraction: Number(fields.source_fraction.value),
+    sourceMolarMassG: Number(fields.source_molar_mass_g.value),
+    productMolarMassG: Number(fields.product_molar_mass_g.value),
+    collisions: Number(fields.collisions.value),
+    probability: Number(fields.probability.value),
+    seed: Number(fields.seed.value),
+  };
+}
+
+function validateParams(values) {
+  if (!values.sourceNuclide) return t("err_source_empty");
+  if (!values.productNuclide) return t("err_product_empty");
+  if (!(values.sourceMassG > 0)) return t("err_mass");
+  if (!(values.sourceFraction > 0 && values.sourceFraction <= 1)) return t("err_fraction");
+  if (!(values.sourceMolarMassG > 0)) return t("err_source_molar");
+  if (!(values.productMolarMassG > 0)) return t("err_product_molar");
+  if (!(Number.isInteger(values.collisions) && values.collisions >= 1)) return t("err_collisions");
+  if (!(values.probability >= 0 && values.probability <= 1)) return t("err_probability");
+  if (!Number.isInteger(values.seed)) return t("err_seed");
+  return "";
+}
+
+function currentQuery() {
+  const values = readForm();
+  return new URLSearchParams({
+    source_nuclide: values.sourceNuclide || params.sourceNuclide,
+    product_nuclide: values.productNuclide || params.productNuclide,
+    source_mass_g: String(values.sourceMassG || params.sourceMassG),
+    source_fraction: String(values.sourceFraction || params.sourceFraction),
+    source_molar_mass_g: String(values.sourceMolarMassG || params.sourceMolarMassG),
+    product_molar_mass_g: String(values.productMolarMassG || params.productMolarMassG),
+    collisions: String(values.collisions || params.collisions),
+    probability: String(Number.isFinite(values.probability) ? values.probability : params.probability),
+    seed: String(Number.isInteger(values.seed) ? values.seed : params.seed),
+    lang: currentLang,
+  });
+}
+
+function applyForm() {
+  const values = readForm();
+  const error = validateParams(values);
+  els.error.hidden = !error;
+  els.error.textContent = error;
+  if (error) return;
+
+  const query = new URLSearchParams({
+    source_nuclide: values.sourceNuclide,
+    product_nuclide: values.productNuclide,
+    source_mass_g: String(values.sourceMassG),
+    source_fraction: String(values.sourceFraction),
+    source_molar_mass_g: String(values.sourceMolarMassG),
+    product_molar_mass_g: String(values.productMolarMassG),
+    collisions: String(values.collisions),
+    probability: String(values.probability),
+    seed: String(values.seed),
+    lang: currentLang,
+  });
+  window.location.search = query.toString();
+}
+
 function fmt(value) {
   const number = Number(value);
   if (Math.abs(number) >= 1e6 || (Math.abs(number) > 0 && Math.abs(number) < 1e-3)) {
     return number.toExponential(4);
   }
-  return new Intl.NumberFormat("it-IT", { maximumFractionDigits: 6 }).format(number);
+  return new Intl.NumberFormat(localeForLang(), { maximumFractionDigits: 6 }).format(number);
+}
+
+function fmtCount(value) {
+  return Number(value).toLocaleString(localeForLang());
 }
 
 function fmtSci(value) {

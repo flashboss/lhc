@@ -12,6 +12,8 @@ import random
 import threading
 import webbrowser
 
+from cli_i18n import cli_t
+
 
 AVOGADRO = 6.02214076e23
 DEFAULT_SOURCE_NUCLIDE = "208Pb"
@@ -20,6 +22,7 @@ DEFAULT_SOURCE_MOLAR_MASS_G = 207.9766525
 DEFAULT_PRODUCT_MOLAR_MASS_G = 204.974
 DEFAULT_SOURCE_MASS_G = 100.0
 DEFAULT_SOURCE_FRACTION = 0.524
+SUPPORTED_LANGS = ("en", "it", "pt", "es", "de", "zh", "ja", "fr")
 
 
 @dataclass
@@ -36,7 +39,7 @@ def simulate_batch(args):
     product_nuclei = 0
 
     for _ in range(collisions):
-        # Ogni collisione può coinvolgere al massimo un nucleo candidato
+        # Each collision can involve at most one candidate nucleus
         if candidate_nuclei > 0 and rng.random() < probability:
             product_nuclei += 1
 
@@ -57,54 +60,54 @@ def split_integer(value, parts):
 
 def main():
     parser = argparse.ArgumentParser(
-        description="Simulazione didattica di trasmutazione nucleare"
+        description="Didactic nuclear transmutation simulation"
     )
 
     parser.add_argument(
         "--source-nuclide",
         default=DEFAULT_SOURCE_NUCLIDE,
-        help="etichetta del nuclide di partenza"
+        help="label of the source nuclide"
     )
 
     parser.add_argument(
         "--product-nuclide",
         default=DEFAULT_PRODUCT_NUCLIDE,
-        help="etichetta del nuclide di arrivo"
+        help="label of the product nuclide"
     )
 
     parser.add_argument(
         "--source-mass-g",
         type=float,
         default=DEFAULT_SOURCE_MASS_G,
-        help="massa teorica iniziale del bersaglio in grammi"
+        help="theoretical initial target mass in grams"
     )
 
     parser.add_argument(
         "--source-fraction",
         type=float,
         default=DEFAULT_SOURCE_FRACTION,
-        help="frazione del nuclide di partenza nel bersaglio"
+        help="fraction of the source nuclide in the target"
     )
 
     parser.add_argument(
         "--source-molar-mass-g",
         type=float,
         default=DEFAULT_SOURCE_MOLAR_MASS_G,
-        help="massa molare del nuclide di partenza in g/mol"
+        help="molar mass of the source nuclide in g/mol"
     )
 
     parser.add_argument(
         "--product-molar-mass-g",
         type=float,
         default=DEFAULT_PRODUCT_MOLAR_MASS_G,
-        help="massa molare del nuclide di arrivo in g/mol"
+        help="molar mass of the product nuclide in g/mol"
     )
 
     parser.add_argument(
         "--collisions",
         type=int,
         default=100_000,
-        help="numero di collisioni virtuali"
+        help="number of virtual collisions"
     )
 
     parser.add_argument(
@@ -112,8 +115,8 @@ def main():
         type=float,
         default=0.0001,
         help=(
-            "probabilità didattica per collisione; "
-            "non è la probabilità reale di un acceleratore"
+            "didactic per-collision probability; "
+            "not the real probability of an accelerator"
         )
     )
 
@@ -121,50 +124,61 @@ def main():
         "--workers",
         type=int,
         default=os.cpu_count() or 1,
-        help="numero di processi paralleli"
+        help="number of parallel processes"
     )
 
     parser.add_argument(
         "--seed",
         type=int,
         default=42,
-        help="seme casuale per risultati riproducibili"
+        help="random seed for reproducible results"
+    )
+
+    parser.add_argument(
+        "--lang",
+        choices=SUPPORTED_LANGS,
+        default="en",
+        help=(
+            "language for the UI and text output: "
+            "en, it, pt, es, de, zh, ja, fr (default: en)"
+        )
     )
 
     parser.add_argument(
         "--cli",
         action="store_true",
-        help="esegui solo in modalità testuale, senza finestra grafica"
+        help="run in text-only mode, without the graphical view"
     )
 
     args = parser.parse_args()
+    lang = args.lang
 
     if not args.source_nuclide.strip():
-        raise SystemExit("Il nuclide di partenza non può essere vuoto")
+        raise SystemExit(cli_t(lang, "err_source_empty"))
 
     if not args.product_nuclide.strip():
-        raise SystemExit("Il nuclide di arrivo non può essere vuoto")
+        raise SystemExit(cli_t(lang, "err_product_empty"))
 
     if args.source_mass_g <= 0:
-        raise SystemExit("La massa del bersaglio deve essere positiva")
+        raise SystemExit(cli_t(lang, "err_mass"))
 
     if not 0 < args.source_fraction <= 1:
-        raise SystemExit("La frazione del nuclide di partenza deve essere tra 0 e 1")
+        raise SystemExit(cli_t(lang, "err_fraction"))
 
     if args.source_molar_mass_g <= 0:
-        raise SystemExit("La massa molare di partenza deve essere positiva")
+        raise SystemExit(cli_t(lang, "err_source_molar"))
 
     if args.product_molar_mass_g <= 0:
-        raise SystemExit("La massa molare di arrivo deve essere positiva")
+        raise SystemExit(cli_t(lang, "err_product_molar"))
 
     if args.collisions < 1:
-        raise SystemExit("Il numero di collisioni deve essere positivo")
+        raise SystemExit(cli_t(lang, "err_collisions"))
 
     if not 0 <= args.probability <= 1:
-        raise SystemExit("La probabilità deve essere tra 0 e 1")
+        raise SystemExit(cli_t(lang, "err_probability"))
 
     if args.workers < 1:
-        raise SystemExit("Il numero di worker deve essere positivo")
+        raise SystemExit(cli_t(lang, "err_workers"))
 
     if not args.cli:
         launch_gui(args)
@@ -208,31 +222,31 @@ def main():
         else 0.0
     )
 
-    print(f"=== Simulazione didattica {args.source_nuclide} -> {args.product_nuclide} ===")
+    print(cli_t(lang, "title", source=args.source_nuclide, product=args.product_nuclide))
     print()
-    print(f"Nuclide di partenza: {args.source_nuclide}")
-    print(f"Nuclide di arrivo: {args.product_nuclide}")
-    print(f"Massa teorica iniziale del bersaglio: {args.source_mass_g:.6g} g")
-    print(f"Frazione del nuclide di partenza: {args.source_fraction:.6g}")
-    print(f"Massa teorica del nuclide di partenza: {source_mass_g:.6g} g")
-    print(f"Nuclei teorici di partenza disponibili: {source_nuclei:,}")
+    print(cli_t(lang, "source_nuclide", value=args.source_nuclide))
+    print(cli_t(lang, "product_nuclide", value=args.product_nuclide))
+    print(cli_t(lang, "target_mass", value=f"{args.source_mass_g:.6g}"))
+    print(cli_t(lang, "source_fraction", value=f"{args.source_fraction:.6g}"))
+    print(cli_t(lang, "source_mass", value=f"{source_mass_g:.6g}"))
+    print(cli_t(lang, "source_nuclei", value=f"{source_nuclei:,}"))
     print()
-    print(f"Collisioni virtuali: {args.collisions:,}")
-    print(f"Processi paralleli: {workers}")
-    print(f"Probabilità didattica: {args.probability:.6g}")
-    print(f"Eventi attesi: {expected_product:.6g}")
-    print(f"Eventi simulati: {product_nuclei:,}")
-    print(f"Eventi senza trasmutazione: {args.collisions - product_nuclei:,}")
+    print(cli_t(lang, "collisions", value=f"{args.collisions:,}"))
+    print(cli_t(lang, "workers", value=f"{workers}"))
+    print(cli_t(lang, "probability", value=f"{args.probability:.6g}"))
+    print(cli_t(lang, "expected", value=f"{expected_product:.6g}"))
+    print(cli_t(lang, "simulated", value=f"{product_nuclei:,}"))
+    print(cli_t(lang, "misses", value=f"{args.collisions - product_nuclei:,}"))
     print()
-    print(f"Nuclei di partenza rimanenti: {remaining_source:,}")
-    print(f"Frazione teorica convertita: {converted_fraction:.6e}")
-    print(f"Massa equivalente simulata del prodotto: {product_mass_g:.6e} g")
+    print(cli_t(lang, "remaining", value=f"{remaining_source:,}"))
+    print(cli_t(lang, "converted", value=f"{converted_fraction:.6e}"))
+    print(cli_t(lang, "product_mass", value=f"{product_mass_g:.6e}"))
     print()
-    print("AVVERTENZA:")
-    print("- nessuna collisione reale è avvenuta")
-    print("- non è stato prodotto alcun nuclide reale")
-    print("- la probabilità è puramente didattica")
-    print("- la massa iniziale è un parametro del modello")
+    print(cli_t(lang, "warning"))
+    print(cli_t(lang, "warn_collision"))
+    print(cli_t(lang, "warn_nuclei"))
+    print(cli_t(lang, "warn_probability"))
+    print(cli_t(lang, "warn_mass"))
 
 
 def launch_gui(args):
@@ -248,6 +262,7 @@ def launch_gui(args):
             "collisions": args.collisions,
             "probability": args.probability,
             "seed": args.seed,
+            "lang": args.lang,
         }
     )
 
@@ -259,15 +274,15 @@ def launch_gui(args):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
-    print("=== Simulazione didattica di trasmutazione ===")
-    print(f"Visualizzazione operazioni: {url}")
-    print("Chiudi la finestra del browser o premi Ctrl+C per terminare")
+    print(cli_t(args.lang, "gui_title"))
+    print(cli_t(args.lang, "gui_url", url=url))
+    print(cli_t(args.lang, "gui_stop"))
     webbrowser.open(url)
 
     try:
         thread.join()
     except KeyboardInterrupt:
-        print("\nSimulazione grafica interrotta")
+        print("\n" + cli_t(args.lang, "gui_interrupted"))
         server.shutdown()
 
 

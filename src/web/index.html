@@ -1,40 +1,96 @@
 <!DOCTYPE html>
-<html lang="it">
+<html lang="en">
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Simulazione didattica di trasmutazione</title>
-  <link rel="stylesheet" href="style.css?v=4">
+  <title>Didactic transmutation simulation</title>
+  <link rel="stylesheet" href="style.css?v=6">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div>
-        <p class="kicker">Simulazione didattica · nessuna collisione reale</p>
-        <h1 id="reaction-title">Trasmutazione</h1>
+        <p class="kicker" data-i18n="kicker">Didactic simulation · no real collision</p>
+        <h1 id="reaction-title">Transmutation</h1>
       </div>
       <div class="controls">
         <label class="speed">
-          Velocità
-          <select id="speed">
-            <option value="2">Ogni operazione</option>
-            <option value="24">Lenta</option>
-            <option value="400" selected>Media</option>
-            <option value="4000">Veloce</option>
-            <option value="25000">Massima</option>
+          <span data-i18n="language">Language</span>
+          <select id="lang">
+            <option value="en">English</option>
+            <option value="it">Italiano</option>
+            <option value="pt">Português</option>
+            <option value="es">Español</option>
+            <option value="de">Deutsch</option>
+            <option value="zh">中文</option>
+            <option value="ja">日本語</option>
+            <option value="fr">Français</option>
           </select>
         </label>
-        <button id="pause" type="button">Pausa</button>
-        <button id="restart" type="button">Riavvia</button>
+        <label class="speed">
+          <span data-i18n="speed">Speed</span>
+          <select id="speed">
+            <option value="2" data-i18n="speed_every">Every operation</option>
+            <option value="24" data-i18n="speed_slow">Slow</option>
+            <option value="400" selected data-i18n="speed_medium">Medium</option>
+            <option value="4000" data-i18n="speed_fast">Fast</option>
+            <option value="25000" data-i18n="speed_max">Maximum</option>
+          </select>
+        </label>
+        <button id="pause" type="button" data-i18n="pause">Pause</button>
+        <button id="restart" type="button" data-i18n="restart">Restart</button>
       </div>
     </header>
 
+    <form id="params-form" class="params">
+      <label>
+        <span data-i18n="source_nuclide">Source nuclide</span>
+        <input name="source_nuclide" type="text" required>
+      </label>
+      <label>
+        <span data-i18n="product_nuclide">Product nuclide</span>
+        <input name="product_nuclide" type="text" required>
+      </label>
+      <label>
+        <span data-i18n="source_mass">Target mass (g)</span>
+        <input name="source_mass_g" type="number" min="0" step="any" required>
+      </label>
+      <label>
+        <span data-i18n="source_fraction">Source fraction</span>
+        <input name="source_fraction" type="number" min="0" max="1" step="any" required>
+      </label>
+      <label>
+        <span data-i18n="source_molar_mass">Source molar mass (g/mol)</span>
+        <input name="source_molar_mass_g" type="number" min="0" step="any" required>
+      </label>
+      <label>
+        <span data-i18n="product_molar_mass">Product molar mass (g/mol)</span>
+        <input name="product_molar_mass_g" type="number" min="0" step="any" required>
+      </label>
+      <label>
+        <span data-i18n="collisions">Collisions</span>
+        <input name="collisions" type="number" min="1" step="1" required>
+      </label>
+      <label>
+        <span data-i18n="probability">Probability</span>
+        <input name="probability" type="number" min="0" max="1" step="any" required>
+      </label>
+      <label>
+        <span data-i18n="seed">Seed</span>
+        <input name="seed" type="number" step="1" required>
+      </label>
+      <div class="params-actions">
+        <button type="submit" data-i18n="apply">Apply</button>
+        <p id="params-error" class="params-error" hidden></p>
+      </div>
+    </form>
+
     <section class="chamber-panel">
-      <canvas id="chamber" width="900" height="620" aria-label="Camera di collisione"></canvas>
+      <canvas id="chamber" width="900" height="620" data-i18n-aria="chamber_aria" aria-label="Collision chamber"></canvas>
       <div id="current-op" class="current-op">
-        <p class="panel-label">Operazione in corso</p>
-        <p class="op-phase">Avvio</p>
-        <h2 id="op-title">Preparazione modello</h2>
+        <p class="panel-label" data-i18n="current_op">Current operation</p>
+        <p class="op-phase">Setup</p>
+        <h2 id="op-title">Prepare model</h2>
         <pre id="op-formula"></pre>
         <p id="op-result"></p>
       </div>
@@ -42,19 +98,19 @@
 
     <div class="hud">
       <div class="stat">
-        <span>Collisioni</span>
+        <span data-i18n="collisions">Collisions</span>
         <strong id="stat-collisions">0</strong>
       </div>
       <div class="stat">
-        <span>Trasmutazioni</span>
+        <span data-i18n="transmutations">Transmutations</span>
         <strong id="stat-gold">0</strong>
       </div>
       <div class="stat">
-        <span>Attese</span>
+        <span data-i18n="expected">Expected</span>
         <strong id="stat-expected">0</strong>
       </div>
       <div class="stat">
-        <span>Massa prodotto</span>
+        <span data-i18n="product_mass">Product mass</span>
         <strong id="stat-mass">0 g</strong>
       </div>
     </div>
@@ -64,20 +120,21 @@
 
     <section class="logs">
       <div>
-        <p class="panel-label">Registro operazioni</p>
+        <p class="panel-label" data-i18n="log_label">Operation log</p>
         <ol id="log" class="log"></ol>
       </div>
       <div>
-        <p class="panel-label">Trasmutazioni osservate</p>
-        <ol id="golds" class="golds"><li class="empty">Nessuna ancora</li></ol>
+        <p class="panel-label" data-i18n="golds_label">Observed transmutations</p>
+        <ol id="golds" class="golds"><li class="empty" data-i18n="golds_empty">None yet</li></ol>
       </div>
     </section>
 
-    <footer>
-      Avvertenza: nessuna collisione reale è avvenuta, non è stato prodotto alcun nuclide reale,
-      la probabilità è puramente didattica e la massa iniziale è un parametro del modello.
+    <footer data-i18n="footer">
+      Warning: no real collision took place, no real nuclide was produced,
+      the probability is purely didactic and the initial mass is a model parameter.
     </footer>
   </div>
-  <script src="app.js?v=4"></script>
+  <script src="i18n.js?v=1"></script>
+  <script src="app.js?v=6"></script>
 </body>
 </html>

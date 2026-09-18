@@ -43,6 +43,7 @@ Stop the graphical session with Ctrl+C in the terminal.
 | `--probability` | `0.0001` | Didactic per-collision transmutation probability |
 | `--workers` | CPU count | Parallel processes (CLI mode only) |
 | `--seed` | `42` | Random seed for reproducible runs |
+| `--lang` | `en` | Language for the UI and `--cli` output: `en`, `it`, `pt`, `es`, `de`, `zh`, `ja`, `fr` |
 | `--cli` | off | Print results in the terminal instead of opening the UI |
 
 Example:
@@ -61,6 +62,8 @@ The UI walks through the model in order:
 
 Controls:
 
+- **Language** — Portuguese, Spanish, English, Italian, German, Chinese, Japanese and French. Opening the page in a browser uses the browser language. From the command line, `--lang` (default `en`) applies to both the UI and `--cli` text output; the combo in the UI can still change it
+- **Parameters** — edit source and product nuclides, masses, collisions, probability and seed, then choose **Apply** to restart
 - **Speed** — from one operation at a time to maximum throughput
 - **Pause / Resume** — Space also toggles pause
 - **Restart** — reload the current parameters
