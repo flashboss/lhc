@@ -1,0 +1,83 @@
+<!DOCTYPE html>
+<html lang="it">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Simulazione didattica 208Pb → 205Au</title>
+  <link rel="stylesheet" href="style.css?v=2">
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div>
+        <p class="kicker">Simulazione didattica · nessuna collisione reale</p>
+        <h1>208Pb → 205Au</h1>
+      </div>
+      <div class="controls">
+        <label class="speed">
+          Velocità
+          <select id="speed">
+            <option value="2">Ogni operazione</option>
+            <option value="24">Lenta</option>
+            <option value="400" selected>Media</option>
+            <option value="4000">Veloce</option>
+            <option value="25000">Massima</option>
+          </select>
+        </label>
+        <button id="pause" type="button">Pausa</button>
+        <button id="restart" type="button">Riavvia</button>
+      </div>
+    </header>
+
+    <section class="chamber-panel">
+      <canvas id="chamber" width="900" height="620" aria-label="Camera di collisione"></canvas>
+      <div id="current-op" class="current-op">
+        <p class="panel-label">Operazione in corso</p>
+        <p class="op-phase">Avvio</p>
+        <h2 id="op-title">Preparazione modello</h2>
+        <pre id="op-formula"></pre>
+        <p id="op-result"></p>
+      </div>
+    </section>
+
+    <div class="hud">
+      <div class="stat">
+        <span>Collisioni</span>
+        <strong id="stat-collisions">0</strong>
+      </div>
+      <div class="stat">
+        <span>Trasmutazioni</span>
+        <strong id="stat-gold">0</strong>
+      </div>
+      <div class="stat">
+        <span>Attese</span>
+        <strong id="stat-expected">0</strong>
+      </div>
+      <div class="stat">
+        <span>Massa Au</span>
+        <strong id="stat-mass">0 g</strong>
+      </div>
+    </div>
+    <div class="progress-wrap">
+      <div id="progress" class="progress"></div>
+    </div>
+
+    <section class="logs">
+      <div>
+        <p class="panel-label">Registro operazioni</p>
+        <ol id="log" class="log"></ol>
+      </div>
+      <div>
+        <p class="panel-label">Trasmutazioni osservate</p>
+        <ol id="golds" class="golds"><li class="empty">Nessuna ancora</li></ol>
+      </div>
+    </section>
+
+    <footer>
+      Avvertenza: nessuna collisione reale è avvenuta, non è stato prodotto oro reale,
+      la probabilità è puramente didattica e la massa iniziale è un parametro del modello.
+    </footer>
+  </div>
+  <script src="app.js?v=3"></script>
+</body>
+</html>
