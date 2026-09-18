@@ -37,6 +37,8 @@ const els = {
   result: document.getElementById("op-result"),
   opLabel: document.getElementById("op-label"),
   currentOp: document.getElementById("current-op"),
+  opChrome: document.getElementById("op-chrome"),
+  opToggle: document.getElementById("op-toggle"),
   log: document.getElementById("log"),
   golds: document.getElementById("golds"),
   form: document.getElementById("params-form"),
@@ -203,7 +205,11 @@ window.addEventListener("keydown", (event) => {
   event.preventDefault();
   els.pause.click();
 });
-window.addEventListener("resize", fitCanvas);
+window.addEventListener("resize", () => {
+  fitCanvas();
+  clampOpWindow();
+});
+setupOpWindow();
 syncViews();
 if (startupError) {
   setOp(t("phase_setup"), startupError, "", t("no_real_nuclei"));
@@ -365,6 +371,67 @@ function setOp(phase, title, formula, result, tone, labelKey) {
   els.formula.textContent = formula;
   els.result.textContent = result;
   els.result.style.color = tone === "gold" ? "#e2b340" : "#7ddeb0";
+}
+
+function setupOpWindow() {
+  let drag = null;
+
+  const startDrag = (event) => {
+    if (event.button != null && event.button !== 0) return;
+    if (event.target.closest("button")) return;
+    const panel = els.chamberPanel.getBoundingClientRect();
+    const win = els.currentOp.getBoundingClientRect();
+    drag = { dx: event.clientX - win.left, dy: event.clientY - win.top };
+    els.currentOp.classList.add("is-dragging");
+  };
+  const moveDrag = (event) => {
+    if (!drag) return;
+    const panel = els.chamberPanel.getBoundingClientRect();
+    placeOpWindow(event.clientX - panel.left - drag.dx, event.clientY - panel.top - drag.dy);
+  };
+  const endDrag = () => {
+    if (!drag) return;
+    drag = null;
+    els.currentOp.classList.remove("is-dragging");
+  };
+
+  els.opChrome.addEventListener("pointerdown", (event) => {
+    startDrag(event);
+    if (drag && event.pointerId != null) els.opChrome.setPointerCapture(event.pointerId);
+  });
+  els.opChrome.addEventListener("pointermove", moveDrag);
+  els.opChrome.addEventListener("pointerup", endDrag);
+  els.opChrome.addEventListener("pointercancel", endDrag);
+  els.opChrome.addEventListener("mousedown", startDrag);
+  window.addEventListener("mousemove", moveDrag);
+  window.addEventListener("mouseup", endDrag);
+  els.opToggle.addEventListener("click", () => {
+    const minimized = els.currentOp.classList.toggle("is-min");
+    els.opToggle.textContent = minimized ? "+" : "–";
+    els.opToggle.setAttribute("aria-expanded", minimized ? "false" : "true");
+    els.opToggle.setAttribute("aria-label", t(minimized ? "op_restore" : "op_minimize"));
+    clampOpWindow();
+  });
+}
+
+function placeOpWindow(left, top) {
+  const panel = els.chamberPanel.getBoundingClientRect();
+  const win = els.currentOp.getBoundingClientRect();
+  const maxLeft = Math.max(0, panel.width - win.width);
+  const maxTop = Math.max(0, panel.height - win.height);
+  const x = Math.min(maxLeft, Math.max(0, left));
+  const y = Math.min(maxTop, Math.max(0, top));
+  els.currentOp.style.left = `${x}px`;
+  els.currentOp.style.top = `${y}px`;
+  els.currentOp.style.right = "auto";
+  els.currentOp.style.bottom = "auto";
+}
+
+function clampOpWindow() {
+  if (!els.currentOp.style.left && !els.currentOp.style.top) return;
+  const panel = els.chamberPanel.getBoundingClientRect();
+  const win = els.currentOp.getBoundingClientRect();
+  placeOpWindow(win.left - panel.left, win.top - panel.top);
 }
 
 function logLine(text, kind) {

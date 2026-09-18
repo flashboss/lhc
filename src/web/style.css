@@ -290,6 +290,55 @@ canvas {
   border-radius: 12px;
   padding: 12px;
   backdrop-filter: blur(8px);
+  z-index: 15;
+  touch-action: none;
+}
+
+.current-op.is-dragging {
+  user-select: none;
+}
+
+.op-chrome {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  margin: -4px -4px 8px;
+  padding: 4px;
+  cursor: grab;
+}
+
+.current-op.is-dragging .op-chrome {
+  cursor: grabbing;
+}
+
+.op-chrome .panel-label {
+  margin: 0;
+  min-width: 0;
+  flex: 1;
+}
+
+.op-toggle {
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  flex: none;
+  line-height: 1;
+  font-size: 16px;
+}
+
+.current-op.is-min {
+  width: auto;
+  max-width: min(260px, calc(100% - 32px));
+  padding: 8px 10px;
+}
+
+.current-op.is-min .op-chrome {
+  margin: 0;
+}
+
+.current-op.is-min .op-body {
+  display: none;
 }
 
 .panel-label {
@@ -442,7 +491,7 @@ canvas {
   .controls,
   .params label { margin-top: 8px; }
 
-  .current-op { width: calc(100% - 24px); }
+  .current-op:not(.is-min) { width: min(420px, calc(100% - 24px)); }
 
   .chamber-panel {
     grid-template-columns: minmax(0, 1fr);
