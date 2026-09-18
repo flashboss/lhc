@@ -77,7 +77,7 @@ const state = {
   particles: [],
   flashes: [],
   nuclei: makeNuclei(42),
-  orbiters: makeOrbiters(56),
+  orbiters: makeOrbiters(24),
 };
 
 const sourceMass = params.sourceMassG * params.sourceFraction;
@@ -404,10 +404,11 @@ function convertNucleus() {
 
 function makeOrbiters(count) {
   const orbiters = [];
+  const bunches = count / 2;
   for (let i = 0; i < count; i += 1) {
     const inner = i % 2 === 0;
     orbiters.push({
-      angle: (Math.PI * 2 * Math.floor(i / 2)) / (count / 2),
+      angle: (Math.PI * 2 * Math.floor(i / 2)) / bunches + (inner ? 0.11 : -0.07),
       dir: inner ? 1 : -1,
       radius: inner ? 192 : 208,
     });
@@ -415,7 +416,7 @@ function makeOrbiters(count) {
   return orbiters;
 }
 
-const RING_OMEGA = [0.5, 1.1, 1.6, 8, 14];
+const RING_OMEGA = [0.6, 1.4, 2.8, 5.5, 9.5];
 
 function updateOrbiters() {
   const now = performance.now();
