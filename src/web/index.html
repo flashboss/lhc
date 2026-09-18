@@ -3,15 +3,15 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>Simulazione didattica 208Pb → 205Au</title>
-  <link rel="stylesheet" href="style.css?v=2">
+  <title>Simulazione didattica di trasmutazione</title>
+  <link rel="stylesheet" href="style.css?v=4">
 </head>
 <body>
   <div class="app">
     <header class="topbar">
       <div>
         <p class="kicker">Simulazione didattica · nessuna collisione reale</p>
-        <h1>208Pb → 205Au</h1>
+        <h1 id="reaction-title">Trasmutazione</h1>
       </div>
       <div class="controls">
         <label class="speed">
@@ -54,7 +54,7 @@
         <strong id="stat-expected">0</strong>
       </div>
       <div class="stat">
-        <span>Massa Au</span>
+        <span>Massa prodotto</span>
         <strong id="stat-mass">0 g</strong>
       </div>
     </div>
@@ -74,10 +74,10 @@
     </section>
 
     <footer>
-      Avvertenza: nessuna collisione reale è avvenuta, non è stato prodotto oro reale,
+      Avvertenza: nessuna collisione reale è avvenuta, non è stato prodotto alcun nuclide reale,
       la probabilità è puramente didattica e la massa iniziale è un parametro del modello.
     </footer>
   </div>
-  <script src="app.js?v=3"></script>
+  <script src="app.js?v=4"></script>
 </body>
 </html>

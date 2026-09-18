@@ -14,32 +14,36 @@ import webbrowser
 
 
 AVOGADRO = 6.02214076e23
-PB208_MOLAR_MASS_G = 207.9766525
-AU205_MOLAR_MASS_G = 204.974
+DEFAULT_SOURCE_NUCLIDE = "208Pb"
+DEFAULT_PRODUCT_NUCLIDE = "205Au"
+DEFAULT_SOURCE_MOLAR_MASS_G = 207.9766525
+DEFAULT_PRODUCT_MOLAR_MASS_G = 204.974
+DEFAULT_SOURCE_MASS_G = 100.0
+DEFAULT_SOURCE_FRACTION = 0.524
 
 
 @dataclass
 class BatchResult:
     collisions: int
     candidate_nuclei: int
-    gold_nuclei: int
+    product_nuclei: int
 
 
 def simulate_batch(args):
     collisions, candidate_nuclei, probability, seed = args
     rng = random.Random(seed)
 
-    gold_nuclei = 0
+    product_nuclei = 0
 
     for _ in range(collisions):
         # Ogni collisione può coinvolgere al massimo un nucleo candidato
         if candidate_nuclei > 0 and rng.random() < probability:
-            gold_nuclei += 1
+            product_nuclei += 1
 
     return BatchResult(
         collisions=collisions,
         candidate_nuclei=candidate_nuclei,
-        gold_nuclei=gold_nuclei,
+        product_nuclei=product_nuclei,
     )
 
 
@@ -53,24 +57,47 @@ def split_integer(value, parts):
 
 def main():
     parser = argparse.ArgumentParser(
-        description=(
-            "Simulazione didattica della trasmutazione "
-            "208Pb -> 205Au"
-        )
+        description="Simulazione didattica di trasmutazione nucleare"
     )
 
     parser.add_argument(
-        "--lead-mass-g",
-        type=float,
-        default=100.0,
-        help="massa teorica iniziale di piombo in grammi"
+        "--source-nuclide",
+        default=DEFAULT_SOURCE_NUCLIDE,
+        help="etichetta del nuclide di partenza"
     )
 
     parser.add_argument(
-        "--pb208-fraction",
+        "--product-nuclide",
+        default=DEFAULT_PRODUCT_NUCLIDE,
+        help="etichetta del nuclide di arrivo"
+    )
+
+    parser.add_argument(
+        "--source-mass-g",
         type=float,
-        default=0.524,
-        help="frazione teorica di Pb-208 nel piombo naturale"
+        default=DEFAULT_SOURCE_MASS_G,
+        help="massa teorica iniziale del bersaglio in grammi"
+    )
+
+    parser.add_argument(
+        "--source-fraction",
+        type=float,
+        default=DEFAULT_SOURCE_FRACTION,
+        help="frazione del nuclide di partenza nel bersaglio"
+    )
+
+    parser.add_argument(
+        "--source-molar-mass-g",
+        type=float,
+        default=DEFAULT_SOURCE_MOLAR_MASS_G,
+        help="massa molare del nuclide di partenza in g/mol"
+    )
+
+    parser.add_argument(
+        "--product-molar-mass-g",
+        type=float,
+        default=DEFAULT_PRODUCT_MOLAR_MASS_G,
+        help="massa molare del nuclide di arrivo in g/mol"
     )
 
     parser.add_argument(
@@ -86,7 +113,7 @@ def main():
         default=0.0001,
         help=(
             "probabilità didattica per collisione; "
-            "non è la probabilità reale dell'LHC"
+            "non è la probabilità reale di un acceleratore"
         )
     )
 
@@ -112,11 +139,23 @@ def main():
 
     args = parser.parse_args()
 
-    if args.lead_mass_g <= 0:
-        raise SystemExit("La massa di piombo deve essere positiva")
+    if not args.source_nuclide.strip():
+        raise SystemExit("Il nuclide di partenza non può essere vuoto")
 
-    if not 0 < args.pb208_fraction <= 1:
-        raise SystemExit("La frazione di Pb-208 deve essere tra 0 e 1")
+    if not args.product_nuclide.strip():
+        raise SystemExit("Il nuclide di arrivo non può essere vuoto")
+
+    if args.source_mass_g <= 0:
+        raise SystemExit("La massa del bersaglio deve essere positiva")
+
+    if not 0 < args.source_fraction <= 1:
+        raise SystemExit("La frazione del nuclide di partenza deve essere tra 0 e 1")
+
+    if args.source_molar_mass_g <= 0:
+        raise SystemExit("La massa molare di partenza deve essere positiva")
+
+    if args.product_molar_mass_g <= 0:
+        raise SystemExit("La massa molare di arrivo deve essere positiva")
 
     if args.collisions < 1:
         raise SystemExit("Il numero di collisioni deve essere positivo")
@@ -131,10 +170,10 @@ def main():
         launch_gui(args)
         return
 
-    pb208_mass_g = args.lead_mass_g * args.pb208_fraction
+    source_mass_g = args.source_mass_g * args.source_fraction
 
-    pb208_nuclei = int(
-        pb208_mass_g / PB208_MOLAR_MASS_G * AVOGADRO
+    source_nuclei = int(
+        source_mass_g / args.source_molar_mass_g * AVOGADRO
     )
 
     workers = min(args.workers, args.collisions)
@@ -143,7 +182,7 @@ def main():
     jobs = [
         (
             batch_size,
-            pb208_nuclei,
+            source_nuclei,
             args.probability,
             args.seed + index,
         )
@@ -153,43 +192,45 @@ def main():
     with ProcessPoolExecutor(max_workers=workers) as executor:
         results = list(executor.map(simulate_batch, jobs))
 
-    gold_nuclei = sum(result.gold_nuclei for result in results)
-    expected_gold = args.collisions * args.probability
+    product_nuclei = sum(result.product_nuclei for result in results)
+    expected_product = args.collisions * args.probability
 
-    gold_mass_g = (
-        gold_nuclei
-        * AU205_MOLAR_MASS_G
+    product_mass_g = (
+        product_nuclei
+        * args.product_molar_mass_g
         / AVOGADRO
     )
 
-    remaining_pb208 = max(pb208_nuclei - gold_nuclei, 0)
+    remaining_source = max(source_nuclei - product_nuclei, 0)
     converted_fraction = (
-        gold_nuclei / pb208_nuclei
-        if pb208_nuclei
+        product_nuclei / source_nuclei
+        if source_nuclei
         else 0.0
     )
 
-    print("=== Simulazione didattica Pb-208 -> Au-205 ===")
+    print(f"=== Simulazione didattica {args.source_nuclide} -> {args.product_nuclide} ===")
     print()
-    print(f"Massa teorica iniziale di piombo: {args.lead_mass_g:.6g} g")
-    print(f"Frazione teorica di Pb-208: {args.pb208_fraction:.6g}")
-    print(f"Massa teorica di Pb-208: {pb208_mass_g:.6g} g")
-    print(f"Nuclei teorici di Pb-208 disponibili: {pb208_nuclei:,}")
+    print(f"Nuclide di partenza: {args.source_nuclide}")
+    print(f"Nuclide di arrivo: {args.product_nuclide}")
+    print(f"Massa teorica iniziale del bersaglio: {args.source_mass_g:.6g} g")
+    print(f"Frazione del nuclide di partenza: {args.source_fraction:.6g}")
+    print(f"Massa teorica del nuclide di partenza: {source_mass_g:.6g} g")
+    print(f"Nuclei teorici di partenza disponibili: {source_nuclei:,}")
     print()
     print(f"Collisioni virtuali: {args.collisions:,}")
     print(f"Processi paralleli: {workers}")
     print(f"Probabilità didattica: {args.probability:.6g}")
-    print(f"Eventi attesi Pb -> Au: {expected_gold:.6g}")
-    print(f"Eventi Pb -> Au simulati: {gold_nuclei:,}")
-    print(f"Eventi senza trasmutazione: {args.collisions - gold_nuclei:,}")
+    print(f"Eventi attesi: {expected_product:.6g}")
+    print(f"Eventi simulati: {product_nuclei:,}")
+    print(f"Eventi senza trasmutazione: {args.collisions - product_nuclei:,}")
     print()
-    print(f"Nuclei Pb-208 rimanenti: {remaining_pb208:,}")
+    print(f"Nuclei di partenza rimanenti: {remaining_source:,}")
     print(f"Frazione teorica convertita: {converted_fraction:.6e}")
-    print(f"Massa equivalente simulata di Au-205: {gold_mass_g:.6e} g")
+    print(f"Massa equivalente simulata del prodotto: {product_mass_g:.6e} g")
     print()
     print("AVVERTENZA:")
     print("- nessuna collisione reale è avvenuta")
-    print("- non è stato prodotto oro reale")
+    print("- non è stato prodotto alcun nuclide reale")
     print("- la probabilità è puramente didattica")
     print("- la massa iniziale è un parametro del modello")
 
@@ -198,8 +239,12 @@ def launch_gui(args):
     web_dir = Path(__file__).resolve().parent / "web"
     query = urlencode(
         {
-            "lead_mass_g": args.lead_mass_g,
-            "pb208_fraction": args.pb208_fraction,
+            "source_nuclide": args.source_nuclide,
+            "product_nuclide": args.product_nuclide,
+            "source_mass_g": args.source_mass_g,
+            "source_fraction": args.source_fraction,
+            "source_molar_mass_g": args.source_molar_mass_g,
+            "product_molar_mass_g": args.product_molar_mass_g,
             "collisions": args.collisions,
             "probability": args.probability,
             "seed": args.seed,
@@ -214,7 +259,7 @@ def launch_gui(args):
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()
 
-    print("=== Simulazione didattica Pb-208 -> Au-205 ===")
+    print("=== Simulazione didattica di trasmutazione ===")
     print(f"Visualizzazione operazioni: {url}")
     print("Chiudi la finestra del browser o premi Ctrl+C per terminare")
     webbrowser.open(url)

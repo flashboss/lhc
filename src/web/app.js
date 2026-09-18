@@ -1,6 +1,8 @@
 const AVOGADRO = 6.02214076e23;
-const PB208_MOLAR_MASS_G = 207.9766525;
-const AU205_MOLAR_MASS_G = 204.974;
+const DEFAULT_SOURCE_NUCLIDE = "208Pb";
+const DEFAULT_PRODUCT_NUCLIDE = "205Au";
+const DEFAULT_SOURCE_MOLAR_MASS_G = 207.9766525;
+const DEFAULT_PRODUCT_MOLAR_MASS_G = 204.974;
 
 const params = readParams();
 const els = {
@@ -21,6 +23,10 @@ const els = {
   golds: document.getElementById("golds"),
 };
 
+const reaction = `${params.sourceNuclide} → ${params.productNuclide}`;
+document.title = `Simulazione didattica ${reaction}`;
+document.getElementById("reaction-title").textContent = reaction;
+
 const ctx = els.canvas.getContext("2d");
 const rng = mulberry32(params.seed);
 
@@ -38,52 +44,52 @@ const state = {
   nuclei: makeNuclei(42),
 };
 
-const pb208Mass = params.leadMassG * params.pb208Fraction;
-const pb208Nuclei = Math.floor(pb208Mass / PB208_MOLAR_MASS_G * AVOGADRO);
-const expectedGold = params.collisions * params.probability;
+const sourceMass = params.sourceMassG * params.sourceFraction;
+const sourceNuclei = Math.floor(sourceMass / params.sourceMolarMassG * AVOGADRO);
+const expectedProduct = params.collisions * params.probability;
 
 const setupOps = [
   {
     phase: "Setup",
     title: "Lettura parametri",
-    formula: `massa piombo = ${fmt(params.leadMassG)} g\nfrazione Pb-208 = ${fmt(params.pb208Fraction)}\ncollisioni = ${params.collisions.toLocaleString("it-IT")}\nprobabilità didattica = ${fmt(params.probability)}\nseme = ${params.seed}`,
+    formula: `nuclide di partenza = ${params.sourceNuclide}\nnuclide di arrivo = ${params.productNuclide}\nmassa bersaglio = ${fmt(params.sourceMassG)} g\nfrazione del nuclide di partenza = ${fmt(params.sourceFraction)}\ncollisioni = ${params.collisions.toLocaleString("it-IT")}\nprobabilità didattica = ${fmt(params.probability)}\nseme = ${params.seed}`,
     result: "Parametri caricati nel modello",
     log: "Parametri di ingresso acquisiti",
   },
   {
     phase: "Setup",
-    title: "Calcolo massa di Pb-208",
-    formula: "m(Pb-208) = massa piombo × frazione\n"
-      + `${fmt(params.leadMassG)} × ${fmt(params.pb208Fraction)}`,
-    result: `m(Pb-208) = ${fmt(pb208Mass)} g`,
-    log: `Massa teorica Pb-208: ${fmt(pb208Mass)} g`,
+    title: "Calcolo massa del nuclide di partenza",
+    formula: "m(sorgente) = massa bersaglio × frazione\n"
+      + `${fmt(params.sourceMassG)} × ${fmt(params.sourceFraction)}`,
+    result: `m(${params.sourceNuclide}) = ${fmt(sourceMass)} g`,
+    log: `Massa teorica ${params.sourceNuclide}: ${fmt(sourceMass)} g`,
   },
   {
     phase: "Setup",
     title: "Calcolo nuclei candidati",
     formula: "N = m / M × N_A\n"
-      + `${fmt(pb208Mass)} / ${PB208_MOLAR_MASS_G} × ${AVOGADRO.toExponential(8)}`,
-    result: `N(Pb-208) = ${fmtSci(pb208Nuclei)}`,
-    log: `Nuclei teorici di Pb-208: ${fmtSci(pb208Nuclei)}`,
+      + `${fmt(sourceMass)} / ${params.sourceMolarMassG} × ${AVOGADRO.toExponential(8)}`,
+    result: `N(${params.sourceNuclide}) = ${fmtSci(sourceNuclei)}`,
+    log: `Nuclei teorici di ${params.sourceNuclide}: ${fmtSci(sourceNuclei)}`,
   },
   {
     phase: "Setup",
     title: "Valore atteso",
     formula: "eventi attesi = collisioni × probabilità\n"
       + `${params.collisions.toLocaleString("it-IT")} × ${fmt(params.probability)}`,
-    result: `eventi attesi = ${fmt(expectedGold)}`,
-    log: `Eventi attesi Pb → Au: ${fmt(expectedGold)}`,
+    result: `eventi attesi = ${fmt(expectedProduct)}`,
+    log: `Eventi attesi: ${fmt(expectedProduct)}`,
   },
   {
     phase: "Setup",
     title: "Avvio collisioni virtuali",
-    formula: "per ogni collisione:\n  u ~ Uniforme(0, 1)\n  se u < p e restano nuclei candidati\n    Pb-208 → Au-205",
-    result: "Registro ogni estrazione, il confronto con p e l'esito",
+    formula: "per ogni collisione:\n  u ~ Uniforme(0, 1)\n  se u < p e restano nuclei candidati\n    sorgente → prodotto",
+    result: `Registro ogni estrazione, il confronto con p e l'esito ${reaction}`,
     log: "Inizio del ciclo Monte Carlo visibile",
   },
 ];
 
-els.expected.textContent = fmt(expectedGold);
+els.expected.textContent = fmt(expectedProduct);
 els.pause.addEventListener("click", () => {
   state.paused = !state.paused;
   els.pause.textContent = state.paused ? "Riprendi" : "Pausa";
@@ -149,13 +155,13 @@ function runCollisions(count) {
   for (let i = 0; i < n; i += 1) {
     const index = state.collision + 1;
     const u = rng();
-    const success = pb208Nuclei > 0 && u < params.probability;
+    const success = sourceNuclei > 0 && u < params.probability;
     if (success) {
       state.gold += 1;
       convertNucleus();
       state.flashes.push({ t: 0, gold: true });
       logLine(
-        `Collisione ${index.toLocaleString("it-IT")}: u=${u.toFixed(8)} < p → Au-205`,
+        `Collisione ${index.toLocaleString("it-IT")}: u=${u.toFixed(8)} < p → ${params.productNuclide}`,
         "gold",
       );
       addGold(index, u);
@@ -171,18 +177,18 @@ function runCollisions(count) {
   }
 
   if (last) {
-    const goldMass = state.gold * AU205_MOLAR_MASS_G / AVOGADRO;
+    const productMass = state.gold * params.productMolarMassG / AVOGADRO;
     setOp(
       "Collisione",
       `Collisione ${last.index.toLocaleString("it-IT")}`,
       `u = ${last.u.toFixed(8)}\np = ${params.probability}\nu < p ? ${last.success ? "sì" : "no"}`,
       last.success
-        ? "Trasmutazione didattica Pb-208 → Au-205"
+        ? `Trasmutazione didattica ${reaction}`
         : "Nessuna trasmutazione",
     );
     els.collisions.textContent = last.index.toLocaleString("it-IT");
     els.gold.textContent = state.gold.toLocaleString("it-IT");
-    els.mass.textContent = `${goldMass.toExponential(4)} g`;
+    els.mass.textContent = `${productMass.toExponential(4)} g`;
     els.progress.style.width = `${(state.collision / params.collisions) * 100}%`;
     if (
       !last.success
@@ -203,21 +209,21 @@ function runCollisions(count) {
 
 function finish() {
   state.phase = "done";
-  const goldMass = state.gold * AU205_MOLAR_MASS_G / AVOGADRO;
-  const remainingPb = Math.max(pb208Nuclei - state.gold, 0);
-  const converted = pb208Nuclei ? state.gold / pb208Nuclei : 0;
+  const productMass = state.gold * params.productMolarMassG / AVOGADRO;
+  const remainingSource = Math.max(sourceNuclei - state.gold, 0);
+  const converted = sourceNuclei ? state.gold / sourceNuclei : 0;
   setOp(
     "Risultati",
     "Chiusura della simulazione",
     `eventi simulati = ${state.gold.toLocaleString("it-IT")}\n`
-      + `eventi attesi = ${fmt(expectedGold)}\n`
-      + `Pb-208 rimanenti = ${fmtSci(remainingPb)}\n`
+      + `eventi attesi = ${fmt(expectedProduct)}\n`
+      + `${params.sourceNuclide} rimanenti = ${fmtSci(remainingSource)}\n`
       + `frazione convertita = ${converted.toExponential(6)}\n`
-      + `massa Au-205 = ${goldMass.toExponential(6)} g`,
-    "Nessun oro reale è stato prodotto",
+      + `massa ${params.productNuclide} = ${productMass.toExponential(6)} g`,
+    "Nessun nuclide reale è stato prodotto",
   );
-  logLine(`Eventi Pb → Au simulati: ${state.gold.toLocaleString("it-IT")}`, "gold");
-  logLine(`Massa equivalente di Au-205: ${goldMass.toExponential(6)} g`, "setup");
+  logLine(`Eventi simulati: ${state.gold.toLocaleString("it-IT")}`, "gold");
+  logLine(`Massa equivalente di ${params.productNuclide}: ${productMass.toExponential(6)} g`, "setup");
   logLine("Avvertenza: modello puramente didattico", "miss");
 }
 
@@ -267,8 +273,8 @@ function makeNuclei(count) {
 }
 
 function convertNucleus() {
-  const lead = state.nuclei.find((nucleus) => !nucleus.gold);
-  if (lead) lead.gold = true;
+  const source = state.nuclei.find((nucleus) => !nucleus.gold);
+  if (source) source.gold = true;
 }
 
 function spawnBeam(dt, rate) {
@@ -347,7 +353,7 @@ function draw() {
   ctx.fillStyle = "#e7edf6";
   ctx.font = "12px Menlo, monospace";
   ctx.fillText("fascio virtuale", -248, -18);
-  ctx.fillText("bersaglio Pb-208", 48, -18);
+  ctx.fillText(`bersaglio ${params.sourceNuclide}`, 48, -18);
   ctx.restore();
 }
 
@@ -361,8 +367,12 @@ function fitCanvas() {
 function readParams() {
   const query = new URLSearchParams(window.location.search);
   return {
-    leadMassG: Number(query.get("lead_mass_g") || 100),
-    pb208Fraction: Number(query.get("pb208_fraction") || 0.524),
+    sourceNuclide: query.get("source_nuclide") || DEFAULT_SOURCE_NUCLIDE,
+    productNuclide: query.get("product_nuclide") || DEFAULT_PRODUCT_NUCLIDE,
+    sourceMassG: Number(query.get("source_mass_g") || 100),
+    sourceFraction: Number(query.get("source_fraction") || 0.524),
+    sourceMolarMassG: Number(query.get("source_molar_mass_g") || DEFAULT_SOURCE_MOLAR_MASS_G),
+    productMolarMassG: Number(query.get("product_molar_mass_g") || DEFAULT_PRODUCT_MOLAR_MASS_G),
     collisions: Number(query.get("collisions") || 100000),
     probability: Number(query.get("probability") || 0.0001),
     seed: Number(query.get("seed") || 42),
