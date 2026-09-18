@@ -18,13 +18,13 @@ No extra Python packages are required. The standard library serves the UI and op
 Graphical view (default):
 
 ```bash
-python3 src/trasmutazione.py
+python3 src/transmutation.py
 ```
 
 Text-only output:
 
 ```bash
-python3 src/trasmutazione.py --cli
+python3 src/transmutation.py --cli
 ```
 
 Stop the graphical session with Ctrl+C in the terminal.
@@ -49,7 +49,7 @@ Stop the graphical session with Ctrl+C in the terminal.
 Example:
 
 ```bash
-python3 src/trasmutazione.py --source-mass-g 100 --collisions 50000 --probability 0.0002
+python3 src/transmutation.py --source-mass-g 100 --collisions 50000 --probability 0.0002
 ```
 
 ## Graphical console
