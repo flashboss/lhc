@@ -13,6 +13,7 @@ import threading
 import webbrowser
 
 from cli_i18n import cli_t
+from nuclides import effective_probability, parse_nuclide
 
 
 AVOGADRO = 6.02214076e23
@@ -66,13 +67,13 @@ def main():
     parser.add_argument(
         "--source-nuclide",
         default=DEFAULT_SOURCE_NUCLIDE,
-        help="label of the source nuclide"
+        help="source nuclide, for example 56Fe or Fe"
     )
 
     parser.add_argument(
         "--product-nuclide",
         default=DEFAULT_PRODUCT_NUCLIDE,
-        help="label of the product nuclide"
+        help="product nuclide, for example 197Au or Au"
     )
 
     parser.add_argument(
@@ -92,15 +93,15 @@ def main():
     parser.add_argument(
         "--source-molar-mass-g",
         type=float,
-        default=DEFAULT_SOURCE_MOLAR_MASS_G,
-        help="molar mass of the source nuclide in g/mol"
+        default=None,
+        help="molar mass of the source nuclide in g/mol (default: from the nuclide)"
     )
 
     parser.add_argument(
         "--product-molar-mass-g",
         type=float,
-        default=DEFAULT_PRODUCT_MOLAR_MASS_G,
-        help="molar mass of the product nuclide in g/mol"
+        default=None,
+        help="molar mass of the product nuclide in g/mol (default: from the nuclide)"
     )
 
     parser.add_argument(
@@ -153,11 +154,13 @@ def main():
     args = parser.parse_args()
     lang = args.lang
 
-    if not args.source_nuclide.strip():
-        raise SystemExit(cli_t(lang, "err_source_empty"))
+    source = _require_nuclide(args.source_nuclide, lang, "source")
+    product = _require_nuclide(args.product_nuclide, lang, "product")
 
-    if not args.product_nuclide.strip():
-        raise SystemExit(cli_t(lang, "err_product_empty"))
+    if args.source_molar_mass_g is None:
+        args.source_molar_mass_g = source.molar_mass
+    if args.product_molar_mass_g is None:
+        args.product_molar_mass_g = product.molar_mass
 
     if args.source_mass_g <= 0:
         raise SystemExit(cli_t(lang, "err_mass"))
@@ -192,12 +195,13 @@ def main():
 
     workers = min(args.workers, args.collisions)
     collision_batches = split_integer(args.collisions, workers)
+    p_model = effective_probability(args.probability, source, product)
 
     jobs = [
         (
             batch_size,
             source_nuclei,
-            args.probability,
+            p_model,
             args.seed + index,
         )
         for index, batch_size in enumerate(collision_batches)
@@ -207,7 +211,7 @@ def main():
         results = list(executor.map(simulate_batch, jobs))
 
     product_nuclei = sum(result.product_nuclei for result in results)
-    expected_product = args.collisions * args.probability
+    expected_product = args.collisions * p_model
 
     product_mass_g = (
         product_nuclei
@@ -225,7 +229,9 @@ def main():
     print(cli_t(lang, "title", source=args.source_nuclide, product=args.product_nuclide))
     print()
     print(cli_t(lang, "source_nuclide", value=args.source_nuclide))
+    print(cli_t(lang, "source_za", z=source.z, a=source.a, mass=f"{args.source_molar_mass_g:.6g}"))
     print(cli_t(lang, "product_nuclide", value=args.product_nuclide))
+    print(cli_t(lang, "product_za", z=product.z, a=product.a, mass=f"{args.product_molar_mass_g:.6g}"))
     print(cli_t(lang, "target_mass", value=f"{args.source_mass_g:.6g}"))
     print(cli_t(lang, "source_fraction", value=f"{args.source_fraction:.6g}"))
     print(cli_t(lang, "source_mass", value=f"{source_mass_g:.6g}"))
@@ -234,6 +240,8 @@ def main():
     print(cli_t(lang, "collisions", value=f"{args.collisions:,}"))
     print(cli_t(lang, "workers", value=f"{workers}"))
     print(cli_t(lang, "probability", value=f"{args.probability:.6g}"))
+    print(cli_t(lang, "distance", dz=abs(source.z - product.z), da=abs(source.a - product.a)))
+    print(cli_t(lang, "model_probability", value=f"{p_model:.6g}"))
     print(cli_t(lang, "expected", value=f"{expected_product:.6g}"))
     print(cli_t(lang, "simulated", value=f"{product_nuclei:,}"))
     print(cli_t(lang, "misses", value=f"{args.collisions - product_nuclei:,}"))
@@ -284,6 +292,17 @@ def launch_gui(args):
     except KeyboardInterrupt:
         print("\n" + cli_t(args.lang, "gui_interrupted"))
         server.shutdown()
+
+
+def _require_nuclide(text, lang, kind):
+    parsed = parse_nuclide(text)
+    if parsed is False:
+        raise SystemExit(cli_t(lang, f"err_{kind}_isotope", value=str(text).strip()))
+    if parsed is None:
+        if not str(text).strip():
+            raise SystemExit(cli_t(lang, f"err_{kind}_empty"))
+        raise SystemExit(cli_t(lang, f"err_{kind}_unknown", value=str(text).strip()))
+    return parsed
 
 
 if __name__ == "__main__":

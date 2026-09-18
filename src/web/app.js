@@ -8,6 +8,17 @@ currentLang = detectLang();
 applyI18n();
 
 const params = readParams();
+const sourceSpec = parseNuclide(params.sourceNuclide);
+const productSpec = parseNuclide(params.productNuclide);
+const pModel = isResolvedNuclide(sourceSpec) && isResolvedNuclide(productSpec)
+  ? effectiveProbability(params.probability, sourceSpec, productSpec)
+  : params.probability;
+const nuclearDz = isResolvedNuclide(sourceSpec) && isResolvedNuclide(productSpec)
+  ? Math.abs(sourceSpec.z - productSpec.z)
+  : 0;
+const nuclearDa = isResolvedNuclide(sourceSpec) && isResolvedNuclide(productSpec)
+  ? Math.abs(sourceSpec.a - productSpec.a)
+  : 0;
 const els = {
   canvas: document.getElementById("chamber"),
   speed: document.getElementById("speed"),
@@ -54,7 +65,7 @@ const state = {
 
 const sourceMass = params.sourceMassG * params.sourceFraction;
 const sourceNuclei = Math.floor(sourceMass / params.sourceMolarMassG * AVOGADRO);
-const expectedProduct = params.collisions * params.probability;
+const expectedProduct = params.collisions * pModel;
 
 const setupOps = [
   {
@@ -67,6 +78,11 @@ const setupOps = [
       fraction: fmt(params.sourceFraction),
       collisions: fmtCount(params.collisions),
       probability: fmt(params.probability),
+      p_model: fmt(pModel),
+      source_z: isResolvedNuclide(sourceSpec) ? sourceSpec.z : "?",
+      source_a: isResolvedNuclide(sourceSpec) ? sourceSpec.a : "?",
+      product_z: isResolvedNuclide(productSpec) ? productSpec.z : "?",
+      product_a: isResolvedNuclide(productSpec) ? productSpec.a : "?",
       seed: params.seed,
     }),
     result: t("setup_read_result"),
@@ -99,6 +115,9 @@ const setupOps = [
     formula: t("setup_expected_formula", {
       collisions: fmtCount(params.collisions),
       probability: fmt(params.probability),
+      dz: fmtCount(nuclearDz),
+      da: fmtCount(nuclearDa),
+      p_model: fmt(pModel),
     }),
     result: t("setup_expected_result", { value: fmt(expectedProduct) }),
     log: t("setup_expected_log", { value: fmt(expectedProduct) }),
@@ -113,11 +132,16 @@ const setupOps = [
 ];
 
 els.expected.textContent = fmt(expectedProduct);
+fillElementOptions();
 fillForm(params);
 els.form.addEventListener("submit", (event) => {
   event.preventDefault();
   applyForm();
 });
+els.form.elements.source_element.addEventListener("change", () => onElementChange("source"));
+els.form.elements.product_element.addEventListener("change", () => onElementChange("product"));
+els.form.elements.source_a.addEventListener("input", () => syncMolarMass("source"));
+els.form.elements.product_a.addEventListener("input", () => syncMolarMass("product"));
 els.lang.addEventListener("change", () => {
   const query = currentQuery();
   query.set("lang", els.lang.value);
@@ -128,6 +152,14 @@ els.pause.addEventListener("click", () => {
   els.pause.textContent = state.paused ? t("resume") : t("pause");
 });
 els.restart.addEventListener("click", () => window.location.reload());
+const startupError = validateParams(params);
+if (startupError) {
+  els.error.hidden = false;
+  els.error.textContent = startupError;
+  state.paused = true;
+  state.phase = "done";
+  els.pause.textContent = t("resume");
+}
 window.addEventListener("keydown", (event) => {
   if (event.code !== "Space") return;
   const tag = event.target && event.target.tagName;
@@ -137,7 +169,11 @@ window.addEventListener("keydown", (event) => {
 });
 window.addEventListener("resize", fitCanvas);
 fitCanvas();
-showSetupOp(setupOps[0], false);
+if (startupError) {
+  setOp(t("phase_setup"), startupError, "", t("no_real_nuclei"));
+} else {
+  showSetupOp(setupOps[0], false);
+}
 requestAnimationFrame(frame);
 
 function frame(ts) {
@@ -189,7 +225,7 @@ function runCollisions(count) {
   for (let i = 0; i < n; i += 1) {
     const index = state.collision + 1;
     const u = rng();
-    const success = sourceNuclei > 0 && u < params.probability;
+    const success = sourceNuclei > 0 && u < pModel;
     if (success) {
       state.gold += 1;
       convertNucleus();
@@ -221,7 +257,7 @@ function runCollisions(count) {
       t("collision_title", { index: fmtCount(last.index) }),
       t("collision_formula", {
         u: last.u.toFixed(8),
-        p: params.probability,
+        p: fmt(pModel),
         answer: last.success ? t("yes") : t("no"),
       }),
       last.success ? t("didactic_transmutation", { reaction }) : t("no_transmutation"),
@@ -313,7 +349,7 @@ function makeNuclei(count) {
       x: Math.cos(angle) * radius,
       y: Math.sin(angle) * radius,
       gold: false,
-      r: 4 + (i % 3),
+      r: nucleusRadius(i),
     });
   }
   return nuclei;
@@ -386,7 +422,7 @@ function draw() {
   for (const nucleus of state.nuclei) {
     ctx.beginPath();
     ctx.arc(nucleus.x, nucleus.y, nucleus.r, 0, Math.PI * 2);
-    ctx.fillStyle = nucleus.gold ? "#e2b340" : "#9aa4b2";
+    ctx.fillStyle = nucleus.gold ? "#e2b340" : sourceNucleusColor();
     ctx.fill();
   }
 
@@ -411,25 +447,87 @@ function fitCanvas() {
   els.canvas.height = Math.max(420, rect.height) * dpr;
 }
 
+function nucleusRadius(index) {
+  const a = isResolvedNuclide(sourceSpec) ? sourceSpec.a : 208;
+  return 2.6 + 3.2 * Math.cbrt(a / 208) + (index % 3) * 0.35;
+}
+
+function sourceNucleusColor() {
+  const z = isResolvedNuclide(sourceSpec) ? sourceSpec.z : 82;
+  const t = Math.min(1, z / 92);
+  const r = Math.round(154 - 38 * t);
+  const g = Math.round(164 - 20 * t);
+  const b = Math.round(168 + 22 * t);
+  return `rgb(${r}, ${g}, ${b})`;
+}
+
 function readParams() {
   const query = new URLSearchParams(window.location.search);
+  const sourceNuclide = query.get("source_nuclide") || DEFAULT_SOURCE_NUCLIDE;
+  const productNuclide = query.get("product_nuclide") || DEFAULT_PRODUCT_NUCLIDE;
+  const source = parseNuclide(sourceNuclide);
+  const product = parseNuclide(productNuclide);
   return {
-    sourceNuclide: query.get("source_nuclide") || DEFAULT_SOURCE_NUCLIDE,
-    productNuclide: query.get("product_nuclide") || DEFAULT_PRODUCT_NUCLIDE,
+    sourceNuclide,
+    productNuclide,
     sourceMassG: Number(query.get("source_mass_g") || 100),
     sourceFraction: Number(query.get("source_fraction") || 0.524),
-    sourceMolarMassG: Number(query.get("source_molar_mass_g") || DEFAULT_SOURCE_MOLAR_MASS_G),
-    productMolarMassG: Number(query.get("product_molar_mass_g") || DEFAULT_PRODUCT_MOLAR_MASS_G),
+    sourceMolarMassG: Number(
+      query.has("source_molar_mass_g")
+        ? query.get("source_molar_mass_g")
+        : (isResolvedNuclide(source) ? source.molarMass : DEFAULT_SOURCE_MOLAR_MASS_G)
+    ),
+    productMolarMassG: Number(
+      query.has("product_molar_mass_g")
+        ? query.get("product_molar_mass_g")
+        : (isResolvedNuclide(product) ? product.molarMass : DEFAULT_PRODUCT_MOLAR_MASS_G)
+    ),
     collisions: Number(query.get("collisions") || 100000),
     probability: Number(query.get("probability") || 0.0001),
     seed: Number(query.get("seed") || 42),
   };
 }
 
+function fillElementOptions() {
+  const options = listElements().map((element) => {
+    const option = document.createElement("option");
+    option.value = element.symbol;
+    option.textContent = `${element.symbol}  (Z=${element.z})`;
+    return option;
+  });
+  for (const name of ["source_element", "product_element"]) {
+    const select = els.form.elements[name];
+    select.replaceChildren(...options.map((option) => option.cloneNode(true)));
+  }
+}
+
+function onElementChange(kind) {
+  const symbol = els.form.elements[`${kind}_element`].value;
+  const z = ELEMENTS[symbol][0];
+  applyIsotopeBounds(kind, z, defaultMassNumber(symbol));
+  syncMolarMass(kind);
+}
+
+function applyIsotopeBounds(kind, z, massNumber) {
+  const bounds = isotopeBounds(z);
+  const field = els.form.elements[`${kind}_a`];
+  field.min = String(bounds.min);
+  field.max = String(bounds.max);
+  if (massNumber != null) field.value = String(massNumber);
+}
+
 function fillForm(values) {
   const fields = els.form.elements;
-  fields.source_nuclide.value = values.sourceNuclide;
-  fields.product_nuclide.value = values.productNuclide;
+  const source = parseNuclide(values.sourceNuclide);
+  const product = parseNuclide(values.productNuclide);
+  if (isResolvedNuclide(source)) {
+    fields.source_element.value = source.symbol;
+    applyIsotopeBounds("source", source.z, source.a);
+  }
+  if (isResolvedNuclide(product)) {
+    fields.product_element.value = product.symbol;
+    applyIsotopeBounds("product", product.z, product.a);
+  }
   fields.source_mass_g.value = values.sourceMassG;
   fields.source_fraction.value = values.sourceFraction;
   fields.source_molar_mass_g.value = values.sourceMolarMassG;
@@ -439,11 +537,17 @@ function fillForm(values) {
   fields.seed.value = values.seed;
 }
 
+function formNuclide(kind) {
+  const symbol = els.form.elements[`${kind}_element`].value;
+  const massNumber = els.form.elements[`${kind}_a`].value;
+  return composeNuclide(symbol, massNumber);
+}
+
 function readForm() {
   const fields = els.form.elements;
   return {
-    sourceNuclide: fields.source_nuclide.value.trim(),
-    productNuclide: fields.product_nuclide.value.trim(),
+    sourceNuclide: formNuclide("source"),
+    productNuclide: formNuclide("product"),
     sourceMassG: Number(fields.source_mass_g.value),
     sourceFraction: Number(fields.source_fraction.value),
     sourceMolarMassG: Number(fields.source_molar_mass_g.value),
@@ -455,8 +559,10 @@ function readForm() {
 }
 
 function validateParams(values) {
-  if (!values.sourceNuclide) return t("err_source_empty");
-  if (!values.productNuclide) return t("err_product_empty");
+  const sourceError = nuclideError(values.sourceNuclide, "source");
+  if (sourceError) return sourceError;
+  const productError = nuclideError(values.productNuclide, "product");
+  if (productError) return productError;
   if (!(values.sourceMassG > 0)) return t("err_mass");
   if (!(values.sourceFraction > 0 && values.sourceFraction <= 1)) return t("err_fraction");
   if (!(values.sourceMolarMassG > 0)) return t("err_source_molar");
@@ -465,6 +571,22 @@ function validateParams(values) {
   if (!(values.probability >= 0 && values.probability <= 1)) return t("err_probability");
   if (!Number.isInteger(values.seed)) return t("err_seed");
   return "";
+}
+
+function nuclideError(text, kind) {
+  if (!String(text || "").trim()) return t(`err_${kind}_empty`);
+  const parsed = parseNuclide(text);
+  if (parsed === false) return t(`err_${kind}_isotope`, { value: String(text).trim() });
+  if (!parsed) return t(`err_${kind}_unknown`, { value: String(text).trim() });
+  return "";
+}
+
+function syncMolarMass(kind) {
+  const parsed = parseNuclide(formNuclide(kind));
+  if (isResolvedNuclide(parsed)) {
+    const molarField = kind === "source" ? "source_molar_mass_g" : "product_molar_mass_g";
+    els.form.elements[molarField].value = parsed.molarMass;
+  }
 }
 
 function currentQuery() {
@@ -484,6 +606,8 @@ function currentQuery() {
 }
 
 function applyForm() {
+  syncMolarMass("source");
+  syncMolarMass("product");
   const values = readForm();
   const error = validateParams(values);
   els.error.hidden = !error;

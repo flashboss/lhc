@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Didactic transmutation simulation</title>
-  <link rel="stylesheet" href="style.css?v=8">
+  <link rel="stylesheet" href="style.css?v=9">
 </head>
 <body>
   <div class="app">
@@ -45,11 +45,17 @@
     <form id="params-form" class="params">
       <label>
         <span data-i18n="source_nuclide">Source nuclide</span>
-        <input name="source_nuclide" type="text" required>
+        <span class="nuclide-pair">
+          <select name="source_element" required></select>
+          <input name="source_a" type="number" min="1" max="295" step="1" required data-i18n-aria="mass_number">
+        </span>
       </label>
       <label>
         <span data-i18n="product_nuclide">Product nuclide</span>
-        <input name="product_nuclide" type="text" required>
+        <span class="nuclide-pair">
+          <select name="product_element" required></select>
+          <input name="product_a" type="number" min="1" max="295" step="1" required data-i18n-aria="mass_number">
+        </span>
       </label>
       <label>
         <span data-i18n="source_mass">Target mass (g)</span>
@@ -134,7 +140,8 @@
       the probability is purely didactic and the initial mass is a model parameter.
     </footer>
   </div>
-  <script src="i18n.js?v=1"></script>
-  <script src="app.js?v=6"></script>
+  <script src="i18n.js?v=3"></script>
+  <script src="nuclides.js?v=2"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

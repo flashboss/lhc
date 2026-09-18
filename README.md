@@ -6,6 +6,8 @@ The graphical console shows every step: parameter setup, each virtual collision 
 
 Default source and product nuclides, together with their molar masses, are defined in the program. Override them from the command line; they are not part of the model description.
 
+Nuclides must be a real element symbol, optionally with a mass number (`Fe`, `56Fe`). The molar mass is taken from the nuclide. A far jump in proton or nucleon number lowers the model probability `p_model`, so different elements do not behave the same.
+
 ## Requirements
 
 - Python 3.9+
@@ -33,14 +35,14 @@ Stop the graphical session with Ctrl+C in the terminal.
 
 | Option | Default | Description |
 | --- | --- | --- |
-| `--source-nuclide` | program default | Label of the source nuclide |
-| `--product-nuclide` | program default | Label of the product nuclide |
+| `--source-nuclide` | program default | Source nuclide (`symbol` or `mass+symbol`) |
+| `--product-nuclide` | program default | Product nuclide (`symbol` or `mass+symbol`) |
 | `--source-mass-g` | `100` | Theoretical initial target mass in grams |
 | `--source-fraction` | `0.524` | Fraction of the source nuclide in the target |
-| `--source-molar-mass-g` | program default | Molar mass of the source nuclide in g/mol |
-| `--product-molar-mass-g` | program default | Molar mass of the product nuclide in g/mol |
+| `--source-molar-mass-g` | from the nuclide | Molar mass of the source nuclide in g/mol |
+| `--product-molar-mass-g` | from the nuclide | Molar mass of the product nuclide in g/mol |
 | `--collisions` | `100000` | Number of virtual collisions |
-| `--probability` | `0.0001` | Didactic per-collision transmutation probability |
+| `--probability` | `0.0001` | Didactic per-collision scale; the run uses `p_model` |
 | `--workers` | CPU count | Parallel processes (CLI mode only) |
 | `--seed` | `42` | Random seed for reproducible runs |
 | `--lang` | `en` | Language for the UI and `--cli` output: `en`, `it`, `pt`, `es`, `de`, `zh`, `ja`, `fr` |
@@ -57,13 +59,13 @@ python3 src/transmutation.py --source-mass-g 100 --collisions 50000 --probabilit
 The UI walks through the model in order:
 
 1. Setup: target mass, candidate nuclei, expected events
-2. Collisions: each trial draws `u ~ Uniform(0, 1)` and transmutes if `u < p`
+2. Collisions: each trial draws `u ~ Uniform(0, 1)` and transmutes if `u < p_model`
 3. Results: simulated vs expected events and equivalent product mass
 
 Controls:
 
 - **Language** — Portuguese, Spanish, English, Italian, German, Chinese, Japanese and French. Opening the page in a browser uses the browser language. From the command line, `--lang` (default `en`) applies to both the UI and `--cli` text output; the combo in the UI can still change it
-- **Parameters** — edit source and product nuclides, masses, collisions, probability and seed, then choose **Apply** to restart
+- **Parameters** — choose source and product elements from the lists, set the mass number, then edit masses, collisions, probability and seed and choose **Apply** to restart. Changing the element updates the molar mass and the model probability
 - **Speed** — from one operation at a time to maximum throughput
 - **Pause / Resume** — Space also toggles pause
 - **Restart** — reload the current parameters
@@ -78,7 +80,14 @@ The target is treated as a mixture that includes a configurable source nuclide. 
 N(source) = m(source) / M(source) × N_A
 ```
 
-Each virtual collision can convert at most one candidate nucleus. Expected events are `collisions × probability`. The equivalent product mass is:
+`M(source)` comes from the chosen nuclide. Each virtual collision can convert at most one candidate nucleus. The scale `p` is reduced when source and product sit far apart in Z and A:
+
+```text
+p_model = p × 6 / max(6, |ΔZ| + |ΔA|)
+expected events = collisions × p_model
+```
+
+The equivalent product mass is:
 
 ```text
 m(product) = N(product) × M(product) / N_A
