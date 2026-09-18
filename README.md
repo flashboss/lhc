@@ -2,7 +2,7 @@
 
 Educational Monte Carlo model of a theoretical source-to-product transmutation. It does **not** represent real accelerator physics, and it does **not** produce real nuclei.
 
-The graphical console shows every step: parameter setup, each virtual collision (random draw `u` compared with probability `p`), transmutation events, and the final equivalent product mass.
+The graphical console shows every step: parameter setup, each virtual collision (random draw `u` compared with probability `p`), transmutation events, and the final equivalent product mass. Open the **Animations** menu to choose **Beam on target** (straight virtual beam) and **Particles in the ring** (circular bunches).
 
 Default source and product nuclides, together with their molar masses, are defined in the program. Override them from the command line; they are not part of the model description.
 

@@ -21,6 +21,7 @@ const nuclearDa = isResolvedNuclide(sourceSpec) && isResolvedNuclide(productSpec
   : 0;
 const els = {
   canvas: document.getElementById("chamber"),
+  ring: document.getElementById("ring"),
   speed: document.getElementById("speed"),
   lang: document.getElementById("lang"),
   pause: document.getElementById("pause"),
@@ -34,19 +35,33 @@ const els = {
   title: document.getElementById("op-title"),
   formula: document.getElementById("op-formula"),
   result: document.getElementById("op-result"),
+  opLabel: document.getElementById("op-label"),
+  currentOp: document.getElementById("current-op"),
   log: document.getElementById("log"),
   golds: document.getElementById("golds"),
   form: document.getElementById("params-form"),
   error: document.getElementById("params-error"),
+  chamberPanel: document.getElementById("chamber-panel"),
+  chamberTarget: document.getElementById("view-target-pane"),
+  chamberRing: document.getElementById("view-ring-pane"),
+  viewTarget: document.getElementById("view-target"),
+  viewRing: document.getElementById("view-ring"),
+  viewsEmpty: document.getElementById("views-empty"),
+  viewMenuWrap: document.getElementById("view-menu-wrap"),
+  viewMenuBtn: document.getElementById("view-menu-btn"),
+  viewMenu: document.getElementById("view-menu"),
+  viewMenuSummary: document.getElementById("view-menu-summary"),
 };
 
 const reaction = `${params.sourceNuclide} → ${params.productNuclide}`;
 document.title = t("doc_title", { reaction });
 document.getElementById("reaction-title").textContent = reaction;
 els.canvas.setAttribute("aria-label", t("chamber_aria"));
+els.ring.setAttribute("aria-label", t("ring_aria"));
 els.lang.value = currentLang;
 
 const ctx = els.canvas.getContext("2d");
+const ringCtx = els.ring.getContext("2d");
 const rng = mulberry32(params.seed);
 
 const state = {
@@ -56,11 +71,13 @@ const state = {
   gold: 0,
   paused: false,
   lastTs: 0,
+  orbitNow: null,
   setupAcc: 0,
   runAcc: 0,
   particles: [],
   flashes: [],
   nuclei: makeNuclei(42),
+  orbiters: makeOrbiters(56),
 };
 
 const sourceMass = params.sourceMassG * params.sourceFraction;
@@ -142,6 +159,20 @@ els.form.elements.source_element.addEventListener("change", () => onElementChang
 els.form.elements.product_element.addEventListener("change", () => onElementChange("product"));
 els.form.elements.source_a.addEventListener("input", () => syncMolarMass("source"));
 els.form.elements.product_a.addEventListener("input", () => syncMolarMass("product"));
+const initialViews = readViewsParam();
+els.viewTarget.checked = initialViews.target;
+els.viewRing.checked = initialViews.ring;
+els.viewTarget.addEventListener("change", onViewChange);
+els.viewRing.addEventListener("change", onViewChange);
+els.viewMenuBtn.addEventListener("click", (event) => {
+  event.stopPropagation();
+  setViewMenuOpen(els.viewMenu.hidden);
+});
+document.addEventListener("click", (event) => {
+  if (els.viewMenu.hidden) return;
+  if (els.viewMenuWrap.contains(event.target)) return;
+  setViewMenuOpen(false);
+});
 els.lang.addEventListener("change", () => {
   const query = currentQuery();
   query.set("lang", els.lang.value);
@@ -161,6 +192,11 @@ if (startupError) {
   els.pause.textContent = t("resume");
 }
 window.addEventListener("keydown", (event) => {
+  if (event.key === "Escape" && !els.viewMenu.hidden) {
+    setViewMenuOpen(false);
+    els.viewMenuBtn.focus();
+    return;
+  }
   if (event.code !== "Space") return;
   const tag = event.target && event.target.tagName;
   if (["INPUT", "SELECT", "TEXTAREA", "BUTTON"].includes(tag)) return;
@@ -168,7 +204,7 @@ window.addEventListener("keydown", (event) => {
   els.pause.click();
 });
 window.addEventListener("resize", fitCanvas);
-fitCanvas();
+syncViews();
 if (startupError) {
   setOp(t("phase_setup"), startupError, "", t("no_real_nuclei"));
 } else {
@@ -177,10 +213,15 @@ if (startupError) {
 requestAnimationFrame(frame);
 
 function frame(ts) {
-  const dt = Math.min(0.05, (ts - state.lastTs) / 1000 || 0.016);
+  const elapsed = (ts - state.lastTs) / 1000 || 0.016;
   state.lastTs = ts;
-  if (!state.paused) step(dt);
+  if (state.paused || state.phase === "done") {
+    state.orbitNow = performance.now();
+  } else {
+    updateOrbiters();
+  }
   draw();
+  if (!state.paused) step(Math.min(0.05, elapsed));
   requestAnimationFrame(frame);
 }
 
@@ -207,12 +248,10 @@ function step(dt) {
   } else if (state.phase === "running") {
     const perSecond = Number(els.speed.value);
     state.runAcc += perSecond * dt;
-    const todo = Math.floor(state.runAcc);
+    const todo = Math.min(Math.floor(state.runAcc), 32);
     state.runAcc -= todo;
     if (todo > 0) runCollisions(todo);
     spawnBeam(dt, Math.min(90, 18 + Math.sqrt(perSecond)));
-  } else {
-    spawnBeam(dt, 8);
   }
 
   updateParticles(dt);
@@ -300,6 +339,7 @@ function finish() {
     }),
     t("no_real_nuclei"),
     "gold",
+    "finished_op",
   );
   logLine(t("events_simulated_log", { value: fmtCount(state.gold) }), "gold");
   logLine(
@@ -317,7 +357,9 @@ function showSetupOp(op, writeLog) {
   if (writeLog) logLine(op.log, "setup");
 }
 
-function setOp(phase, title, formula, result, tone) {
+function setOp(phase, title, formula, result, tone, labelKey) {
+  els.opLabel.textContent = t(labelKey || "current_op");
+  els.currentOp.classList.toggle("is-done", labelKey === "finished_op");
   els.phase.textContent = phase;
   els.title.textContent = title;
   els.formula.textContent = formula;
@@ -360,6 +402,32 @@ function convertNucleus() {
   if (source) source.gold = true;
 }
 
+function makeOrbiters(count) {
+  const orbiters = [];
+  for (let i = 0; i < count; i += 1) {
+    const inner = i % 2 === 0;
+    orbiters.push({
+      angle: (Math.PI * 2 * Math.floor(i / 2)) / (count / 2),
+      dir: inner ? 1 : -1,
+      radius: inner ? 192 : 208,
+    });
+  }
+  return orbiters;
+}
+
+const RING_OMEGA = [0.5, 1.1, 1.6, 8, 14];
+
+function updateOrbiters() {
+  const now = performance.now();
+  if (state.orbitNow == null) state.orbitNow = now;
+  const dt = Math.min(0.08, (now - state.orbitNow) / 1000);
+  state.orbitNow = now;
+  const omega = RING_OMEGA[els.speed.selectedIndex] ?? 1.6;
+  for (const orbiter of state.orbiters) {
+    orbiter.angle += orbiter.dir * omega * dt;
+  }
+}
+
 function spawnBeam(dt, rate) {
   const n = Math.max(0, Math.round(rate * dt));
   for (let i = 0; i < n; i += 1) {
@@ -390,6 +458,11 @@ function updateParticles(dt) {
 }
 
 function draw() {
+  if (!els.chamberTarget.hidden) drawTarget();
+  if (!els.chamberRing.hidden) drawRing();
+}
+
+function drawTarget() {
   const { width, height } = els.canvas;
   ctx.clearRect(0, 0, width, height);
   ctx.save();
@@ -440,11 +513,70 @@ function draw() {
   ctx.restore();
 }
 
+function drawRing() {
+  const { width, height } = els.ring;
+  ringCtx.clearRect(0, 0, width, height);
+  ringCtx.save();
+  ringCtx.translate(width / 2, height / 2);
+  const scale = Math.min(width, height) / 520;
+  ringCtx.scale(scale, scale);
+
+  ringCtx.strokeStyle = "#2c3648";
+  ringCtx.lineWidth = 10;
+  ringCtx.beginPath();
+  ringCtx.arc(0, 0, 200, 0, Math.PI * 2);
+  ringCtx.stroke();
+
+  ringCtx.strokeStyle = "#3d4a5f";
+  ringCtx.lineWidth = 2;
+  for (const radius of [192, 208]) {
+    ringCtx.beginPath();
+    ringCtx.arc(0, 0, radius, 0, Math.PI * 2);
+    ringCtx.stroke();
+  }
+
+  ringCtx.strokeStyle = "#6ec4ff";
+  ringCtx.lineWidth = 2;
+  ringCtx.beginPath();
+  ringCtx.arc(-200, 0, 10, 0, Math.PI * 2);
+  ringCtx.stroke();
+
+  for (const flash of state.flashes) {
+    ringCtx.beginPath();
+    ringCtx.arc(-200, 0, 8 + flash.t * 90, 0, Math.PI * 2);
+    ringCtx.strokeStyle = `rgba(226, 179, 64, ${1 - flash.t / 0.6})`;
+    ringCtx.lineWidth = 3;
+    ringCtx.stroke();
+  }
+
+  for (const orbiter of state.orbiters) {
+    const x = Math.cos(orbiter.angle) * orbiter.radius;
+    const y = Math.sin(orbiter.angle) * orbiter.radius;
+    ringCtx.beginPath();
+    ringCtx.arc(x, y, 2.4, 0, Math.PI * 2);
+    ringCtx.fillStyle = orbiter.dir > 0 ? "rgba(110, 196, 255, 0.95)" : "rgba(226, 179, 64, 0.8)";
+    ringCtx.fill();
+  }
+
+  ringCtx.fillStyle = "#e7edf6";
+  ringCtx.font = "12px Menlo, monospace";
+  ringCtx.textAlign = "center";
+  ringCtx.textBaseline = "middle";
+  ringCtx.fillText(t("virtual_ring"), 0, 0);
+  ringCtx.restore();
+}
+
 function fitCanvas() {
-  const rect = els.canvas.getBoundingClientRect();
   const dpr = window.devicePixelRatio || 1;
-  els.canvas.width = Math.max(640, rect.width) * dpr;
-  els.canvas.height = Math.max(420, rect.height) * dpr;
+  for (const canvas of [els.canvas, els.ring]) {
+    if (canvas.closest("[hidden]")) continue;
+    const rect = canvas.getBoundingClientRect();
+    if (rect.width < 2 || rect.height < 2) continue;
+    const width = Math.max(1, Math.round(rect.width * dpr));
+    const height = Math.max(1, Math.round(rect.height * dpr));
+    if (canvas.width !== width) canvas.width = width;
+    if (canvas.height !== height) canvas.height = height;
+  }
 }
 
 function nucleusRadius(index) {
@@ -602,6 +734,7 @@ function currentQuery() {
     probability: String(Number.isFinite(values.probability) ? values.probability : params.probability),
     seed: String(Number.isInteger(values.seed) ? values.seed : params.seed),
     lang: currentLang,
+    views: viewsQueryValue(),
   });
 }
 
@@ -625,8 +758,60 @@ function applyForm() {
     probability: String(values.probability),
     seed: String(values.seed),
     lang: currentLang,
+    views: viewsQueryValue(),
   });
   window.location.search = query.toString();
+}
+
+function viewsQueryValue() {
+  const parts = [];
+  if (els.viewTarget.checked) parts.push("target");
+  if (els.viewRing.checked) parts.push("ring");
+  return parts.join(",") || "none";
+}
+
+function readViewsParam() {
+  const raw = new URLSearchParams(window.location.search).get("views");
+  if (raw == null) return { target: true, ring: true };
+  if (raw === "none" || raw === "") return { target: false, ring: false };
+  const parts = raw.split(",");
+  return {
+    target: parts.includes("target"),
+    ring: parts.includes("ring"),
+  };
+}
+
+function syncViews() {
+  const showTarget = els.viewTarget.checked;
+  const showRing = els.viewRing.checked;
+  els.chamberTarget.hidden = !showTarget;
+  els.chamberRing.hidden = !showRing;
+  els.viewsEmpty.hidden = showTarget || showRing;
+  els.chamberPanel.classList.toggle("is-single", Boolean(showTarget) !== Boolean(showRing));
+  els.chamberPanel.classList.toggle("is-empty", !showTarget && !showRing);
+  updateViewSummary();
+  fitCanvas();
+}
+
+function updateViewSummary() {
+  const target = els.viewTarget.checked;
+  const ring = els.viewRing.checked;
+  if (target && ring) els.viewMenuSummary.textContent = t("animations_both");
+  else if (target) els.viewMenuSummary.textContent = t("view_target");
+  else if (ring) els.viewMenuSummary.textContent = t("view_ring");
+  else els.viewMenuSummary.textContent = t("animations_none");
+}
+
+function setViewMenuOpen(open) {
+  els.viewMenu.hidden = !open;
+  els.viewMenuBtn.setAttribute("aria-expanded", open ? "true" : "false");
+}
+
+function onViewChange() {
+  syncViews();
+  const query = new URLSearchParams(window.location.search);
+  query.set("views", viewsQueryValue());
+  history.replaceState(null, "", `${window.location.pathname}?${query.toString()}`);
 }
 
 function fmt(value) {

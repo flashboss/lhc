@@ -4,7 +4,7 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>Didactic transmutation simulation</title>
-  <link rel="stylesheet" href="style.css?v=9">
+  <link rel="stylesheet" href="style.css?v=15">
 </head>
 <body>
   <div class="app">
@@ -37,6 +37,24 @@
             <option value="25000" data-i18n="speed_max">Maximum</option>
           </select>
         </label>
+        <div class="speed">
+          <span data-i18n="animations">Animations</span>
+          <div class="view-menu" id="view-menu-wrap">
+            <button type="button" id="view-menu-btn" class="view-menu-btn" aria-haspopup="true" aria-expanded="false" aria-controls="view-menu" data-i18n-aria="animations_menu">
+              <span id="view-menu-summary">Both</span>
+            </button>
+            <div id="view-menu" class="view-menu-panel" hidden role="group" aria-labelledby="view-menu-btn">
+              <label>
+                <input id="view-target" type="checkbox" checked>
+                <span data-i18n="view_target">Beam on target</span>
+              </label>
+              <label>
+                <input id="view-ring" type="checkbox" checked>
+                <span data-i18n="view_ring">Particles in the ring</span>
+              </label>
+            </div>
+          </div>
+        </div>
         <button id="pause" type="button" data-i18n="pause">Pause</button>
         <button id="restart" type="button" data-i18n="restart">Restart</button>
       </div>
@@ -91,10 +109,16 @@
       </div>
     </form>
 
-    <section class="chamber-panel">
-      <canvas id="chamber" width="900" height="620" data-i18n-aria="chamber_aria" aria-label="Collision chamber"></canvas>
+    <section class="chamber-panel" id="chamber-panel">
+      <div class="chamber-pane" id="view-target-pane">
+        <canvas id="chamber" width="900" height="620" data-i18n-aria="chamber_aria" aria-label="Collision chamber"></canvas>
+      </div>
+      <div class="chamber-pane" id="view-ring-pane">
+        <canvas id="ring" width="900" height="620" data-i18n-aria="ring_aria" aria-label="Virtual ring"></canvas>
+      </div>
+      <p id="views-empty" class="views-empty" hidden data-i18n="views_empty">Choose at least one animation</p>
       <div id="current-op" class="current-op">
-        <p class="panel-label" data-i18n="current_op">Current operation</p>
+        <p id="op-label" class="panel-label" data-i18n="current_op">Current operation</p>
         <p class="op-phase">Setup</p>
         <h2 id="op-title">Prepare model</h2>
         <pre id="op-formula"></pre>
@@ -140,8 +164,8 @@
       the probability is purely didactic and the initial mass is a model parameter.
     </footer>
   </div>
-  <script src="i18n.js?v=3"></script>
+  <script src="i18n.js?v=8"></script>
   <script src="nuclides.js?v=2"></script>
-  <script src="app.js?v=8"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>
