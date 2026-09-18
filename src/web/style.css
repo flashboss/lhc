@@ -24,8 +24,17 @@ body {
 
 .app {
   height: 100%;
+  overflow: hidden;
   display: grid;
-  grid-template-rows: auto auto minmax(240px, 1fr) auto auto minmax(120px, 0.42fr) auto;
+  grid-template-rows: auto auto minmax(0, 1fr) auto auto minmax(0, 0.42fr) auto;
+}
+
+.app > * {
+  min-height: 0;
+}
+
+.app > footer {
+  min-height: auto;
 }
 
 .topbar,
@@ -48,8 +57,12 @@ footer {
 footer {
   border-bottom: 0;
   border-top: 1px solid var(--line);
+  background: var(--bg);
   color: var(--muted);
   font-size: 12px;
+  position: relative;
+  z-index: 5;
+  min-height: auto;
 }
 
 .topbar {
@@ -242,17 +255,35 @@ canvas {
   grid-template-columns: 1.4fr 0.8fr;
   gap: 16px;
   min-height: 0;
+  overflow: clip;
+  contain: layout paint;
   padding-top: 10px;
   padding-bottom: 8px;
 }
 
+.logs > div {
+  position: relative;
+  min-height: 0;
+  height: 100%;
+  overflow: clip;
+}
+
+.logs .panel-label {
+  margin: 0;
+}
+
 .log,
 .golds {
+  position: absolute;
+  top: 22px;
+  right: 0;
+  bottom: 0;
+  left: 0;
   margin: 0;
   padding: 0;
   list-style: none;
   overflow: auto;
-  max-height: 100%;
+  overscroll-behavior: contain;
   font-family: var(--mono);
   font-size: 12px;
 }
@@ -261,6 +292,7 @@ canvas {
 .golds li {
   padding: 5px 0;
   border-bottom: 1px solid #232b39;
+  background: var(--bg);
 }
 
 .log li.gold,
@@ -274,9 +306,18 @@ canvas {
 
 @media (max-width: 760px) {
   .hud,
-  .logs,
   .topbar,
   .params { display: block; }
+
+  .logs {
+    display: flex;
+    flex-direction: column;
+  }
+
+  .logs > div {
+    flex: 1;
+    min-height: 0;
+  }
 
   .stat,
   .controls,
