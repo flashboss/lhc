@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="description" content="Didactic Monte Carlo transmutation console. No real collision, no real nuclei.">
+  <title>Didactic transmutation simulation</title>
+  <link rel="stylesheet" href="site/home.css">
+</head>
+<body class="home">
+  <header class="home-top">
+    <p class="kicker" data-i18n="home_kicker">Didactic Monte Carlo · no real collision</p>
+    <label class="lang">
+      <span data-i18n="language">Language</span>
+      <select id="lang">
+        <option value="en">English</option>
+        <option value="it">Italiano</option>
+        <option value="pt">Português</option>
+        <option value="es">Español</option>
+        <option value="de">Deutsch</option>
+        <option value="zh">中文</option>
+        <option value="ja">日本語</option>
+        <option value="fr">Français</option>
+      </select>
+    </label>
+  </header>
+
+  <main>
+    <section class="hero">
+      <div class="hero-copy">
+        <h1 data-i18n="home_heading">Watch a theoretical transmutation, step by step</h1>
+        <p class="lead" data-i18n="home_lead">An educational console that draws a uniform random number for each virtual collision and compares it with a model probability. It does not represent real accelerator physics and it does not produce real nuclei.</p>
+        <div class="actions">
+          <a id="open-sim" class="btn primary" href="src/web/index.html">Open the simulation</a>
+          <a class="btn ghost" href="https://github.com/flashboss/lhc">Source on GitHub</a>
+        </div>
+      </div>
+      <div class="stage" aria-hidden="true">
+        <div class="stage-pane">
+          <div class="beam-line"></div>
+          <div class="beam-dot"></div>
+          <div class="target"></div>
+          <span class="stage-label">virtual beam</span>
+        </div>
+        <div class="stage-pane">
+          <div class="ring"></div>
+          <div class="orbit cyan"><span class="bunch"></span></div>
+          <div class="orbit gold"><span class="bunch"></span></div>
+          <span class="stage-label">virtual ring</span>
+        </div>
+      </div>
+    </section>
+
+    <section>
+      <h2 data-i18n="home_how">How the console walks through the model</h2>
+      <div class="steps">
+        <article>
+          <p class="step-n">1</p>
+          <h3 data-i18n="home_step1_title">Setup</h3>
+          <p data-i18n="home_step1_body">Target mass, candidate nuclei and the expected number of events are computed from the parameters you choose.</p>
+        </article>
+        <article>
+          <p class="step-n">2</p>
+          <h3 data-i18n="home_step2_title">Collisions</h3>
+          <p data-i18n="home_step2_body">Each trial draws u ~ Uniform(0, 1) and records a didactic transmutation when u is below p_model.</p>
+        </article>
+        <article>
+          <p class="step-n">3</p>
+          <h3 data-i18n="home_step3_title">Results</h3>
+          <p data-i18n="home_step3_body">Simulated events are compared with the expected value, together with the equivalent product mass.</p>
+        </article>
+      </div>
+    </section>
+
+    <section class="split">
+      <div>
+        <h2 data-i18n="home_model_title">Model</h2>
+        <p data-i18n="home_model_intro">The target is treated as a mixture that includes a configurable source nuclide. A far jump in proton or nucleon number lowers the model probability p_model, so different elements do not behave the same.</p>
+        <pre>N(source) = m(source) / M(source) × N_A
+
+p_model = p × 6 / max(6, |ΔZ| + |ΔA|)
+expected events = collisions × p_model
+
+m(product) = N(product) × M(product) / N_A</pre>
+      </div>
+      <div>
+        <h2 data-i18n="home_run_title">Run it locally</h2>
+        <p data-i18n="home_run_body">Python 3.9+ and a browser are enough. No extra packages. The standard library serves the graphical console.</p>
+        <pre>python3 src/transmutation.py</pre>
+      </div>
+    </section>
+
+    <aside class="warning">
+      <h2 data-i18n="home_warning_title">Warning</h2>
+      <ul>
+        <li data-i18n="home_warn_1">No real collisions take place</li>
+        <li data-i18n="home_warn_2">No real nuclei are produced</li>
+        <li data-i18n="home_warn_3">The probability is purely didactic</li>
+        <li data-i18n="home_warn_4">The initial mass is a model parameter, not a laboratory sample</li>
+      </ul>
+    </aside>
+  </main>
+
+  <footer data-i18n="footer">
+    Warning: no real collision took place, no real nuclide was produced,
+    the probability is purely didactic and the initial mass is a model parameter.
+  </footer>
+
+  <script src="src/web/i18n.js?v=10"></script>
+  <script src="site/home.js"></script>
+</body>
+</html>

@@ -31,6 +31,10 @@ python3 src/transmutation.py --cli
 
 Stop the graphical session with Ctrl+C in the terminal.
 
+## GitHub Pages
+
+The landing page is `index.html` at the repository root. In the repository settings, enable Pages from the `main` branch and the `/` (root) folder. The live site then serves the homepage and the graphical console at `src/web/`.
+
 ## Options
 
 | Option | Default | Description |
